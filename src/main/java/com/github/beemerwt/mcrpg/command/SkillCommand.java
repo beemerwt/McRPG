@@ -3,7 +3,7 @@ package com.github.beemerwt.mcrpg.command;
 import com.github.beemerwt.mcrpg.xp.Leveling;
 import com.github.beemerwt.mcrpg.data.PlayerStore;
 import com.github.beemerwt.mcrpg.permission.Permissions;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;

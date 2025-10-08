@@ -7,8 +7,8 @@ import com.github.beemerwt.mcrpg.config.AbilityConfig;
 import com.github.beemerwt.mcrpg.config.IHasBlocks;
 import com.github.beemerwt.mcrpg.config.SkillConfig;
 import com.github.beemerwt.mcrpg.config.ability.GigaDrillBreakerConfig;
-import com.github.beemerwt.mcrpg.skills.Ability;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.ActiveAbilityType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -134,13 +134,13 @@ public class ExcavationConfig extends SkillConfig implements IHasBlocks {
     }
 
     @Override
-    public boolean hasAbility(Ability ability) {
-        return ability == Ability.GIGA_DRILL_BREAKER;
+    public boolean hasAbility(ActiveAbilityType activeAbilityType) {
+        return activeAbilityType == ActiveAbilityType.GIGA_DRILL_BREAKER;
     }
 
     @Override
-    public Optional<AbilityConfig> getAbilityConfig(Ability ability) {
-        return switch (ability) {
+    public Optional<AbilityConfig> getAbilityConfig(ActiveAbilityType activeAbilityType) {
+        return switch (activeAbilityType) {
             case GIGA_DRILL_BREAKER -> Optional.of(gigaDrillBreaker);
             default -> Optional.empty();
         };

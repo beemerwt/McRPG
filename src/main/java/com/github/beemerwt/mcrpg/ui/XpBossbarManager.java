@@ -1,9 +1,10 @@
 package com.github.beemerwt.mcrpg.ui;
 
-import com.github.beemerwt.mcrpg.config.ConfigManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.SkillConfig;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.text.NamedTextColor;
+import com.github.beemerwt.mcrpg.util.SoundUtil;
 import com.github.beemerwt.mcrpg.xp.Leveling;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -82,9 +83,9 @@ public final class XpBossbarManager {
         if (beforeLevel < level && playSound) {
             // Milestone: every 100 levels, also play the toast "challenge complete" sound
             if (level % 100 == 0)
-                sp.playSound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
+                SoundUtil.playSound(sp, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
             else
-                sp.playSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 0.8f, 1.0f);
+                SoundUtil.playSound(sp, SoundEvents.ENTITY_PLAYER_LEVELUP, 0.8f, 1.0f);
         }
 
         // Title: "Mining Lv.5"

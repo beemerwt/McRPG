@@ -2,14 +2,14 @@ package com.github.beemerwt.mcrpg;
 
 import com.github.beemerwt.mcrpg.command.AdminCommand;
 import com.github.beemerwt.mcrpg.command.SkillCommand;
-import com.github.beemerwt.mcrpg.config.ConfigManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.data.BinaryPlayerStore;
 import com.github.beemerwt.mcrpg.data.PlayerStore;
 import com.github.beemerwt.mcrpg.events.AbilityEvents;
 import com.github.beemerwt.mcrpg.events.BlockEvents;
 import com.github.beemerwt.mcrpg.events.CombatEvents;
 import com.github.beemerwt.mcrpg.events.MovementEvents;
-import com.github.beemerwt.mcrpg.skills.AbilityManager;
+import com.github.beemerwt.mcrpg.managers.AbilityManager;
 import com.github.beemerwt.mcrpg.ui.HealthbarHover;
 import com.github.beemerwt.mcrpg.ui.XpBossbarManager;
 import com.github.beemerwt.mcrpg.util.FabricLogger;

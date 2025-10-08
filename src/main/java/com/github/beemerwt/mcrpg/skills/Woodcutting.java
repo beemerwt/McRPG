@@ -1,8 +1,11 @@
 package com.github.beemerwt.mcrpg.skills;
 
 import com.github.beemerwt.mcrpg.McRPG;
-import com.github.beemerwt.mcrpg.config.ConfigManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.WoodcuttingConfig;
+import com.github.beemerwt.mcrpg.data.ActiveAbilityType;
+import com.github.beemerwt.mcrpg.data.SkillType;
+import com.github.beemerwt.mcrpg.managers.AbilityManager;
 import com.github.beemerwt.mcrpg.skills.ability.DoubleDrops;
 import com.github.beemerwt.mcrpg.skills.ability.LeafBlower;
 import com.github.beemerwt.mcrpg.skills.ability.TreeFeller;
@@ -39,7 +42,7 @@ public class Woodcutting {
 
         // Only trigger abilities when using an axe
         if (ItemClassifier.isAxe(player.getMainHandStack().getItem())) {
-            if (AbilityManager.isActive(player, Ability.TREE_FELLER)) {
+            if (AbilityManager.isActive(player, ActiveAbilityType.TREE_FELLER)) {
                 long totalFromFeller = TreeFeller.fellAndProcess(player, pos, level, cfg);
                 if (totalFromFeller <= 0) return;
 

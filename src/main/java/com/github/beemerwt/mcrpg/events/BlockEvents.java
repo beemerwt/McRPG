@@ -1,7 +1,7 @@
 package com.github.beemerwt.mcrpg.events;
 
 import com.github.beemerwt.mcrpg.McRPG;
-import com.github.beemerwt.mcrpg.config.ConfigManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.data.CropMarkers;
 import com.github.beemerwt.mcrpg.data.PlacedBlockTracker;
 import com.github.beemerwt.mcrpg.skills.Excavation;

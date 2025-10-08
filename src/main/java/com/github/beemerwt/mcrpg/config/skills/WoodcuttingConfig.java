@@ -9,8 +9,8 @@ import com.github.beemerwt.mcrpg.config.SkillConfig;
 import com.github.beemerwt.mcrpg.config.ability.DoubleDropsConfig;
 import com.github.beemerwt.mcrpg.config.ability.LeafBlowerConfig;
 import com.github.beemerwt.mcrpg.config.ability.TreeFellerConfig;
-import com.github.beemerwt.mcrpg.skills.Ability;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.ActiveAbilityType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 
 import java.util.Map;
 import java.util.Optional;
@@ -53,13 +53,13 @@ public class WoodcuttingConfig extends SkillConfig implements IHasBlocks {
     }
 
     @Override
-    public boolean hasAbility(Ability ability) {
-        return ability == Ability.TREE_FELLER;
+    public boolean hasAbility(ActiveAbilityType activeAbilityType) {
+        return activeAbilityType == ActiveAbilityType.TREE_FELLER;
     }
 
     @Override
-    public Optional<AbilityConfig> getAbilityConfig(Ability ability) {
-        return switch (ability) {
+    public Optional<AbilityConfig> getAbilityConfig(ActiveAbilityType activeAbilityType) {
+        return switch (activeAbilityType) {
             case TREE_FELLER -> Optional.of(treeFeller);
             default -> Optional.empty();
         };

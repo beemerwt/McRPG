@@ -6,7 +6,7 @@ import com.github.beemerwt.mcrpg.annotation.JanksonObject;
 import com.github.beemerwt.mcrpg.config.IHasBlocks;
 import com.github.beemerwt.mcrpg.config.SkillConfig;
 import com.github.beemerwt.mcrpg.config.ability.*;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 
 import java.util.Map;
 

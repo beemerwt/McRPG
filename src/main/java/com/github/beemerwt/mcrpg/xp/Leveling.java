@@ -1,9 +1,9 @@
 package com.github.beemerwt.mcrpg.xp;
 
 import com.github.beemerwt.mcrpg.McRPG;
-import com.github.beemerwt.mcrpg.config.ConfigManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.GeneralConfig;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.ui.XpBossbarManager;
 import net.minecraft.block.Block;
 import net.minecraft.registry.Registries;
@@ -106,6 +106,12 @@ public final class Leveling {
     public static double getScaled(double min, double max, int level) {
         int maxLevel = ConfigManager.getGeneralConfig().maxLevel;
         double t = Math.max(0.0, Math.min(1.0, (double) level / (double) maxLevel));
+        return Math.lerp(min, max, t);
+    }
+
+    public static float getScaled(float min, float max, int level) {
+        int maxLevel = ConfigManager.getGeneralConfig().maxLevel;
+        float t = Math.max(0.0f, Math.min(1.0f, (float) level / (float) maxLevel));
         return Math.lerp(min, max, t);
     }
 

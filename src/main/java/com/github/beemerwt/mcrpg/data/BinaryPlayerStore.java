@@ -1,7 +1,5 @@
 package com.github.beemerwt.mcrpg.data;
 
-import com.github.beemerwt.mcrpg.skills.Ability;
-import com.github.beemerwt.mcrpg.skills.SkillType;
 import net.fabricmc.loader.api.FabricLoader;
 import org.jetbrains.annotations.NotNull;
 
@@ -294,8 +292,8 @@ public final class BinaryPlayerStore implements PlayerStore, Closeable {
         catch (IllegalArgumentException ex) { return null; }
     }
 
-    private Ability safeAbility(short id) {
-        try { return Ability.fromId(id); }
+    private ActiveAbilityType safeAbility(short id) {
+        try { return ActiveAbilityType.fromId(id); }
         catch (IllegalArgumentException ex) { return null; }
     }
 

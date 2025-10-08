@@ -1,8 +1,9 @@
 package com.github.beemerwt.mcrpg.skills;
 
 import com.github.beemerwt.mcrpg.McRPG;
-import com.github.beemerwt.mcrpg.config.ConfigManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.MiningConfig;
+import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.skills.ability.DoubleDrops;
 import com.github.beemerwt.mcrpg.util.BlockClassifier;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;

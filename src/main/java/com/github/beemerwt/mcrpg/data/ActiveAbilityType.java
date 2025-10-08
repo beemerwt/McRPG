@@ -1,6 +1,6 @@
-package com.github.beemerwt.mcrpg.skills;
+package com.github.beemerwt.mcrpg.data;
 
-public enum Ability {
+public enum ActiveAbilityType {
     TREE_FELLER((short) 1, "Tree Feller"),
     GIGA_DRILL_BREAKER((short) 2, "Giga Drill Breaker"),
     SKULL_SPLITTER((short) 3, "Skull Splitter"),
@@ -12,12 +12,12 @@ public enum Ability {
 
     private final short id;
     private final String displayName;
-    Ability(short id, String displayName) {
+    ActiveAbilityType(short id, String displayName) {
         this.id = id;
         this.displayName = displayName;
     }
 
-    public static Ability fromId(short id) {
+    public static ActiveAbilityType fromId(short id) {
         for (var a : values()) {
             if (a.id == id) return a;
         }

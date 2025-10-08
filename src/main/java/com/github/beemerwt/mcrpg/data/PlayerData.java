@@ -1,7 +1,5 @@
 package com.github.beemerwt.mcrpg.data;
 
-import com.github.beemerwt.mcrpg.skills.SkillType;
-
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.UUID;

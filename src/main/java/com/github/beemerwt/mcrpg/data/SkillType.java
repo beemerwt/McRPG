@@ -1,4 +1,4 @@
-package com.github.beemerwt.mcrpg.skills;
+package com.github.beemerwt.mcrpg.data;
 
 public enum SkillType {
     // General skills

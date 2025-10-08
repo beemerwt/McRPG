@@ -1,10 +1,10 @@
 package com.github.beemerwt.mcrpg.events;
 
 import com.github.beemerwt.mcrpg.McRPG;
-import com.github.beemerwt.mcrpg.config.ConfigManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.GeneralConfig;
 import com.github.beemerwt.mcrpg.mixin.DamageTrackerAccessor;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
 import com.github.beemerwt.mcrpg.xp.Leveling;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;

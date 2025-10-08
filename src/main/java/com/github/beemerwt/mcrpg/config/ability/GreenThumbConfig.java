@@ -7,7 +7,7 @@ import com.github.beemerwt.mcrpg.config.AbilityConfig;
 @JanksonObject
 public class GreenThumbConfig extends AbilityConfig {
     @JankComment("Growth speed multiplier, scaling with skill level")
-    public double baseGrowthMultiplier = 1.0;
-    public double maxGrowthMultiplier = 4.0;
+    public float baseGrowthMultiplier = 1.0f;
+    public float maxGrowthMultiplier = 4.0f;
 
 }

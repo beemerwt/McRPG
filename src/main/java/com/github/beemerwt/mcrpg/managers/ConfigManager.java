@@ -1,12 +1,16 @@
-package com.github.beemerwt.mcrpg.config;
+package com.github.beemerwt.mcrpg.managers;
 
 import blue.endless.jankson.Jankson;
 import blue.endless.jankson.JsonObject;
 import blue.endless.jankson.api.SyntaxError;
 import com.github.beemerwt.mcrpg.McRPG;
+import com.github.beemerwt.mcrpg.config.AbilityConfig;
+import com.github.beemerwt.mcrpg.config.GeneralConfig;
+import com.github.beemerwt.mcrpg.config.IHasBlocks;
+import com.github.beemerwt.mcrpg.config.SkillConfig;
 import com.github.beemerwt.mcrpg.config.skills.ExcavationConfig;
-import com.github.beemerwt.mcrpg.skills.Ability;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.ActiveAbilityType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.util.FabricLogger;
 import com.github.beemerwt.mcrpg.util.JanksonSerde;
 import net.fabricmc.loader.api.FabricLoader;
@@ -30,7 +34,7 @@ public final class ConfigManager {
 
     private static final GeneralConfig GENERAL = new GeneralConfig();
     static final Map<SkillType, SkillConfig> BY_SKILL = new EnumMap<>(SkillType.class);
-    private static volatile EnumMap<Ability, SkillConfig> ABILITY_TO_SKILL = new EnumMap<>(Ability.class);
+    private static volatile EnumMap<ActiveAbilityType, SkillConfig> ABILITY_TO_SKILL = new EnumMap<>(ActiveAbilityType.class);
 
     private ConfigManager() {}
 
@@ -115,14 +119,14 @@ public final class ConfigManager {
     }
 
     @SuppressWarnings("unchecked")
-    public static <T extends AbilityConfig> Optional<T> getAbilityConfig(Ability a) {
+    public static <T extends AbilityConfig> Optional<T> getAbilityConfig(ActiveAbilityType a) {
         return whichSkillHasAbility(a)
                 .flatMap(skill -> skill.getAbilityConfig(a))
                 .filter(cfg -> cfg.enabled)
                 .map(cfg -> (T) cfg);
     }
 
-    public static Optional<SkillConfig> whichSkillHasAbility(Ability a) {
+    public static Optional<SkillConfig> whichSkillHasAbility(ActiveAbilityType a) {
         return Optional.ofNullable(ABILITY_TO_SKILL.get(a));
     }
 
@@ -134,12 +138,12 @@ public final class ConfigManager {
     }
 
     public static void rebuildAbilityIndex() {
-        EnumMap<Ability, SkillConfig> idx = new EnumMap<>(Ability.class);
+        EnumMap<ActiveAbilityType, SkillConfig> idx = new EnumMap<>(ActiveAbilityType.class);
 
         for (SkillConfig cfg : BY_SKILL.values()) {
             if (cfg == null) continue;
 
-            for (Ability a : Ability.values()) {
+            for (ActiveAbilityType a : ActiveAbilityType.values()) {
                 if (!cfg.hasAbility(a)) continue;
 
                 SkillConfig prev = idx.putIfAbsent(a, cfg);

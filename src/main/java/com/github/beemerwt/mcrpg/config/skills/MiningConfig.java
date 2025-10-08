@@ -9,8 +9,8 @@ import com.github.beemerwt.mcrpg.config.SkillConfig;
 import com.github.beemerwt.mcrpg.config.ability.BlastMiningConfig;
 import com.github.beemerwt.mcrpg.config.ability.DoubleDropsConfig;
 import com.github.beemerwt.mcrpg.config.ability.SuperBreakerConfig;
-import com.github.beemerwt.mcrpg.skills.Ability;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.ActiveAbilityType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 
 import java.util.Map;
 import java.util.Optional;
@@ -100,14 +100,14 @@ public class MiningConfig extends SkillConfig implements IHasBlocks {
     }
 
     @Override
-    public boolean hasAbility(Ability ability) {
-        return ability == Ability.SUPER_BREAKER
-            || ability == Ability.BLAST_MINING;
+    public boolean hasAbility(ActiveAbilityType activeAbilityType) {
+        return activeAbilityType == ActiveAbilityType.SUPER_BREAKER
+            || activeAbilityType == ActiveAbilityType.BLAST_MINING;
     }
 
     @Override
-    public Optional<AbilityConfig> getAbilityConfig(Ability ability) {
-        return switch (ability) {
+    public Optional<AbilityConfig> getAbilityConfig(ActiveAbilityType activeAbilityType) {
+        return switch (activeAbilityType) {
             case SUPER_BREAKER -> Optional.of(superBreaker);
             case BLAST_MINING -> Optional.of(blastMining);
             default -> Optional.empty();

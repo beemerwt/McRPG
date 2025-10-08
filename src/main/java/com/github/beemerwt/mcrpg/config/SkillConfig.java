@@ -7,8 +7,9 @@ import com.github.beemerwt.mcrpg.annotation.JankComment;
 import com.github.beemerwt.mcrpg.annotation.JankIgnore;
 import com.github.beemerwt.mcrpg.annotation.JanksonObject;
 import com.github.beemerwt.mcrpg.config.skills.*;
-import com.github.beemerwt.mcrpg.skills.Ability;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.ActiveAbilityType;
+import com.github.beemerwt.mcrpg.data.SkillType;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.util.JanksonSerde;
 
 import java.io.IOException;
@@ -22,7 +23,7 @@ public class SkillConfig extends Config {
     private static final Path ROOT = ConfigManager.SKILLS_DIR;
 
     @JankIgnore
-    protected final SkillType skillType;
+    public final SkillType skillType;
 
     @JankComment("Global XP modifier for this skill.")
     public double xpModifier = 1.0;
@@ -38,15 +39,15 @@ public class SkillConfig extends Config {
         return skillType;
     }
 
-    public boolean hasAbility(Ability ability) {
+    public boolean hasAbility(ActiveAbilityType activeAbilityType) {
         return false;
     }
 
-    public Optional<AbilityConfig> getAbilityConfig(Ability ability) {
+    public Optional<AbilityConfig> getAbilityConfig(ActiveAbilityType activeAbilityType) {
         return Optional.empty();
     }
 
-    static SkillConfig createOrLoadConfig(SkillType skillType) {
+    public static SkillConfig createOrLoadConfig(SkillType skillType) {
         SkillConfig cfg = null;
 
         var skillName = skillType.name().toLowerCase();

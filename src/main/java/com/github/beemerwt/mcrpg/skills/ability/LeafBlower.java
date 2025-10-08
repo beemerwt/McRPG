@@ -1,9 +1,9 @@
 package com.github.beemerwt.mcrpg.skills.ability;
 
 import com.github.beemerwt.mcrpg.McRPG;
-import com.github.beemerwt.mcrpg.config.ConfigManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.WoodcuttingConfig;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.xp.Leveling;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.ItemEntity;

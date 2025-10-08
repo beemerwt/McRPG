@@ -1,11 +1,11 @@
 package com.github.beemerwt.mcrpg.command;
 
-import com.github.beemerwt.mcrpg.config.ConfigManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.data.PlayerData;
 import com.github.beemerwt.mcrpg.data.PlayerStore;
 import com.github.beemerwt.mcrpg.permission.Permissions;
-import com.github.beemerwt.mcrpg.skills.AbilityManager;
-import com.github.beemerwt.mcrpg.skills.SkillType;
+import com.github.beemerwt.mcrpg.managers.AbilityManager;
+import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.ui.XpBossbarManager;
 import com.github.beemerwt.mcrpg.xp.Leveling;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
