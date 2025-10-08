@@ -1,0 +1,15 @@
+package com.github.beemerwt.mcrpg.config.ability;
+
+
+import com.github.beemerwt.mcrpg.annotation.JankComment;
+import com.github.beemerwt.mcrpg.annotation.JanksonObject;
+
+@JanksonObject
+public class DoubleDropsConfig {
+    @JankComment("Set to false to disable this ability")
+    public boolean enabled = true;
+
+    @JankComment("Percentage chance to trigger, scaling with skill level")
+    public double baseChance = 0.0;
+    public double maxChance = 100.0;
+}

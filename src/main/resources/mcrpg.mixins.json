@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.github.beemerwt.mcrpg.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BlockOnPlacedMixin",
+    "DamageTrackerAccessor",
+    "HerbalismRandomTickMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}
