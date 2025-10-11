@@ -24,8 +24,13 @@ public final class Leveling {
 
     // ---------- XP curve helpers ----------
 
+    private static boolean isLinear(GeneralConfig.XpCurve curve) {
+        // Keep parity with existing config semantics
+        return "linear".equalsIgnoreCase(curve.base);
+    }
+
     private static long xpForLevel(int level, GeneralConfig.XpCurve curve) {
-        if ("linear".equalsIgnoreCase(curve.base)) {
+        if (isLinear(curve)) {
             // per-level requirement at this level
             return curve.linearBase + (long) level * curve.multiplier;
         }
@@ -56,10 +61,10 @@ public final class Leveling {
 
         var curve = ConfigManager.getGeneralConfig().xpCurve;
 
-        if ("linear".equalsIgnoreCase(curve.base)) {
+        if (isLinear(curve)) {
             // Sum_{i=1..L} (base + i*multiplier) = L*base + multiplier * L*(L+1)/2
-            return (long) level * curve.linearBase + curve.multiplier
-                    * (long) level * ((long) level + 1L) / 2L;
+            return (long) level * curve.linearBase
+                    + curve.multiplier * (long) level * ((long) level + 1L) / 2L;
         }
 
         // Sum_{i=1..L} (a*i^2 + b*i + c)
@@ -159,6 +164,15 @@ public final class Leveling {
 
     private static void addXpInternal(UUID playerId, SkillType skill, long amount) {
         if (amount == 0) return;
+
+        // Hard gate: completely disable XP if current effective level >= threshold.
+        // Using GeneralConfig.maxLevel as the cutoff. If you want a different threshold,
+        // replace this with a config value, e.g., generalCfg.disableXpAtLevel.
+        final int disableAtLevel = ConfigManager.getGeneralConfig().maxLevel;
+        if (getLevel(playerId, skill) >= disableAtLevel) {
+            return;
+        }
+
         ServerPlayerEntity player = McRPG.getServer().getPlayerManager().getPlayer(playerId);
 
         // Alias: write to primary but display the alias skill on the bossbar
@@ -211,7 +225,12 @@ public final class Leveling {
         if (amount == 0) return;
         PlayerData data = McRPG.getStore().get(playerId);
         long before = data.xp.getOrDefault(bucket, 0L);
+
         long after  = Math.max(0L, before + amount);
+
+        long max = maxTotalXp();
+        if (after > max) after = max;
+
         data.xp.put(bucket, after);
     }
 
@@ -246,37 +265,34 @@ public final class Leveling {
         return start + within;
     }
 
-    public static long cumulativeXpForLevel(int level) {
-        long total = 0;
-
-        for (int i = 1; i <= level; i++) {
-            total += Leveling.xpForLevel(i);
-        }
-        return total;
-    }
-
     public static long maxTotalXp() {
         int max = java.lang.Math.max(0, ConfigManager.getGeneralConfig().maxLevel);
-        return cumulativeXpForLevel(max);
+        return totalXpFromLevel(max);
     }
 
     // ---------- Scaling helpers ----------
 
+    private static double clamp01(double v) {
+        if (v <= 0.0) return 0.0;
+        if (v >= 1.0) return 1.0;
+        return v;
+    }
+
     public static long getScaled(int min, int max, int level) {
         int maxLevel = ConfigManager.getGeneralConfig().maxLevel;
-        double t = Math.max(0.0, Math.min(1.0, (double) level / (double) maxLevel));
+        double t = clamp01((double) level / (double) maxLevel);
         return Math.round(Math.lerp(min, max, t));
     }
 
     public static double getScaled(double min, double max, int level) {
         int maxLevel = ConfigManager.getGeneralConfig().maxLevel;
-        double t = Math.max(0.0, Math.min(1.0, (double) level / (double) maxLevel));
+        double t = clamp01((double) level / (double) maxLevel);
         return Math.lerp(min, max, t);
     }
 
     public static float getScaled(float min, float max, int level) {
         int maxLevel = ConfigManager.getGeneralConfig().maxLevel;
-        float t = Math.max(0.0f, Math.min(1.0f, (float) level / (float) maxLevel));
+        float t = (float) clamp01((double) level / (double) maxLevel);
         return Math.lerp(min, max, t);
     }
 

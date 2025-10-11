@@ -15,7 +15,7 @@ public class SwordsConfig extends SkillConfig {
 
         @JankComment("Damage will get divided by this modifier, scaling from base to max with level")
         public double baseDamageModifier = 4.0;
-        public double maxDamageModifier = 1.5;
+        public double minDamageModifier = 1.5;
 
         @JankComment("Bleed duration in ticks, scaling from base to max with level")
         public int baseBleedTicks = 5;

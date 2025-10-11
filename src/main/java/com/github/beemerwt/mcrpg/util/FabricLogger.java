@@ -43,7 +43,7 @@ public class FabricLogger {
     }
 
     public void debug(String msg, Object... args) {
-        if (globalDebug) logger.info(format(msg, args));
+        if (globalDebug) logger.info(prefix(format(msg, args)));
     }
 
     public void info(String msg, Object... args) {
@@ -105,7 +105,7 @@ public class FabricLogger {
 
     /** Shortcut: log exception with message (debug level). */
     public void debug(Throwable t, String msg, Object... args) {
-        if (globalDebug) logger.info(format(msg, args), t);
+        if (globalDebug) logger.info(prefix(format(msg, args)), t);
     }
 }
 

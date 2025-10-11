@@ -8,6 +8,7 @@
     "ScreenHandlerMixin",
     "AbstractFurnaceScreenHandlerMixin",
     "AbstractFurnaceBlockEntityMixin",
+    "PlayerInventoryMixin",
     "access.DamageTrackerAccessor",
     "access.CropBlockInvoker"
   ],

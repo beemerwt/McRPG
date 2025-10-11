@@ -71,6 +71,7 @@ public final class XpBossbarManager {
 
     public static void showSkillXp(ServerPlayerEntity sp, SkillType skill, long justAdded, long newTotalXp, boolean playSound) {
         SkillConfig skillCfg = ConfigManager.getSkillConfig(skill);
+        if (justAdded == 0) return; // nothing to show
 
         // Compute level, progress within level, and next requirement
         int beforeLevel = Leveling.levelFromTotalXp(Math.max(0, newTotalXp - justAdded));

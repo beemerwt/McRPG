@@ -108,6 +108,21 @@ public final class AdminCommand {
                         ctx.getSource().sendFeedback(() -> Text.literal("Reset all ability cooldowns."), false);
                         return 1;
                     }))
+
+                    .then(literal("debug")
+                            .then(argument("enabled", StringArgumentType.word()).suggests(ON_OFF_SUGGESTIONS)
+                                    .executes(ctx -> {
+                                        String raw = StringArgumentType.getString(ctx, "enabled");
+                                        boolean on;
+                                        if (raw.equalsIgnoreCase("on")) on = true;
+                                        else if (raw.equalsIgnoreCase("off")) on = false;
+                                        else throw new SimpleCommandExceptionType(Text.literal("Expected 'on' or 'off', got: " + raw)).create();
+
+                                        ConfigManager.setDebug(on);
+                                        ctx.getSource().sendFeedback(() -> Text.literal("Set debug " + (on ? "ON" : "OFF")), false);
+                                        return 1;
+                                    })
+                            ))
             );
         });
     }
@@ -122,7 +137,7 @@ public final class AdminCommand {
         int maxLevel = Math.max(0, ConfigManager.getGeneralConfig().maxLevel);
         int newLevel = Math.min(Math.max(0, requested), maxLevel);
 
-        long newTotal = Leveling.cumulativeXpForLevel(newLevel); // no % preservation
+        long newTotal = Leveling.totalXpFromLevel(newLevel); // no % preservation
         PlayerData data = store.get(target);
         data.xp.put(skill, newTotal);
 
@@ -210,6 +225,13 @@ public final class AdminCommand {
                 for (String s : suggested)
                     b.suggest(s);
 
+                return b.buildFuture();
+            };
+
+    private static final SuggestionProvider<ServerCommandSource> ON_OFF_SUGGESTIONS =
+            (ctx, b) -> {
+                b.suggest("on");
+                b.suggest("off");
                 return b.buildFuture();
             };
 

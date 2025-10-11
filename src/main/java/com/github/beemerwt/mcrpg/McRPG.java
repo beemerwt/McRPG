@@ -9,6 +9,7 @@ import com.github.beemerwt.mcrpg.data.PlayerStore;
 import com.github.beemerwt.mcrpg.managers.AbilityManager;
 import com.github.beemerwt.mcrpg.skills.Acrobatics;
 import com.github.beemerwt.mcrpg.skills.Smelting;
+import com.github.beemerwt.mcrpg.skills.Swords;
 import com.github.beemerwt.mcrpg.ui.HealthbarHover;
 import com.github.beemerwt.mcrpg.ui.XpBossbarManager;
 import com.github.beemerwt.mcrpg.util.FabricLogger;
@@ -53,6 +54,7 @@ public class McRPG implements ModInitializer {
 
         Acrobatics.register();
         Smelting.register();
+        Swords.register();
 
         ServerPlayerEvents.JOIN.register(player -> {
             // On player join:

@@ -26,6 +26,9 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+// TODO: Merge with AbilityManager to handle the intermediate events and emit callbacks
+// TODO: Then register the callbacks in the individual skill classes
+
 public class AbilityEvents {
     public static void register() {
         UseBlockCallback.EVENT.register(AbilityEvents::onPlayerUse);

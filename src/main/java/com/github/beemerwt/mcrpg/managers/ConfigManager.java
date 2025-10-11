@@ -158,4 +158,21 @@ public final class ConfigManager {
 
         ABILITY_TO_SKILL = idx;
     }
+
+    public static void setDebug(boolean debug) {
+        GENERAL.debug = debug;
+        FabricLogger.setGlobalDebug(debug);
+
+        McRPG.getLogger().info("Debug logging is now {}", debug ? "ENABLED" : "disabled");
+
+        // Save the setting to general.json5
+        try {
+            var generalConfig = JanksonSerde.toJson(GENERAL);
+            var generalFile = CONFIG_DIR.resolve("general.json5");
+            Files.createDirectories(generalFile.getParent());
+            Files.writeString(generalFile, generalConfig.toJson(true, true));
+        } catch (Exception ex) {
+            McRPG.getLogger().error(ex, "Failed to update general.json5!");
+        }
+    }
 }

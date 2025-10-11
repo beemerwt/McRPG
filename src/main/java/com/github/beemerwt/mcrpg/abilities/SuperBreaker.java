@@ -35,8 +35,7 @@ public class SuperBreaker {
                 EntityAttributeModifier.Operation.ADD_VALUE
         );
 
-        Multimap<RegistryEntry<EntityAttribute>, EntityAttributeModifier> add = ImmutableMultimap.of(speedAttr, mod);
-        player.getAttributes().addTemporaryModifiers(add);
+        player.getAttributes().addTemporaryModifiers(ImmutableMultimap.of(speedAttr, mod));
     }
 
     public static void deactivateFor(ServerPlayerEntity player) {
