@@ -1,4 +1,4 @@
-package com.github.beemerwt.mcrpg.mixin;
+package com.github.beemerwt.mcrpg.mixin.access;
 
 import net.minecraft.entity.damage.DamageRecord;
 import net.minecraft.entity.damage.DamageTracker;

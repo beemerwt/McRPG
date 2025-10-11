@@ -1,11 +1,12 @@
-package com.github.beemerwt.mcrpg.skills.ability;
+package com.github.beemerwt.mcrpg.abilities;
 
 import com.github.beemerwt.mcrpg.McRPG;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.HerbalismConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.util.Growth;
-import com.github.beemerwt.mcrpg.xp.Leveling;
+import com.github.beemerwt.mcrpg.util.TickScheduler;
+import com.github.beemerwt.mcrpg.util.Leveling;
 import net.minecraft.block.*;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -14,17 +15,20 @@ import net.minecraft.state.property.IntProperty;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 
-import java.util.ArrayDeque;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+
+// TODO: Particle effect and/or sound on replant
 
 public final class GreenTerra {
     private record ReplantCandidate(BlockPos pos, BlockState seedling) { }
 
     private static final Map<UUID, ArrayDeque<ReplantCandidate>> QUEUE = new ConcurrentHashMap<>();
+    // New: track who already has a pending flush scheduled
+    private static final Set<UUID> SCHEDULED = ConcurrentHashMap.newKeySet();
+
+    private static final int FLUSH_DELAY_TICKS = 40; // ~2s @20tps
+    private static final int PER_FLUSH_LIMIT   = 0; // plant up to N per pass (set 0 or Integer.MAX_VALUE to disable limiting)
 
     private GreenTerra() { }
 
@@ -33,11 +37,74 @@ public final class GreenTerra {
     }
 
     public static void deactivateFor(ServerPlayerEntity player) {
-        var q = QUEUE.remove(player.getUuid());
+        // Full/last flush of remaining items
+        flushNow(player, player.getEntityWorld(), true);
+        // Clean up queue
+        QUEUE.remove(player.getUuid());
+        SCHEDULED.remove(player.getUuid());
+    }
+
+    /**
+     * Called from Herbalism.onCropBroken (only if fully grown).
+     */
+    public static void considerReplant(ServerPlayerEntity player, ServerWorld world, BlockPos pos, BlockState brokenState) {
+        var q = QUEUE.get(player.getUuid());
+        if (q == null) return; // not active
+
+        for (var r : REPLANTERS) {
+            var seed = r.seedling(world, pos, brokenState);
+            if (seed.isPresent()) {
+                q.add(new ReplantCandidate(pos.toImmutable(), seed.get()));
+                // schedule a delayed flush if not already scheduled
+                scheduleFlush(player.getUuid(), world);
+                return;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Scheduling
+    // ------------------------------------------------------------------------
+
+    private static void scheduleFlush(UUID playerId, ServerWorld world) {
+        if (!SCHEDULED.add(playerId)) return; // already scheduled
+
+        // Use your TickScheduler; this runs on server thread
+        TickScheduler.schedule(FLUSH_DELAY_TICKS, () -> {
+            try {
+                // Resolve player at run time (handles dimension changes / respawns)
+                var server = world.getServer();
+                var player = server.getPlayerManager().getPlayer(playerId);
+                if (player != null) {
+                    // partial flush (respect PER_FLUSH_LIMIT)
+                    flushNow(player, world, false);
+                }
+            } finally {
+                SCHEDULED.remove(playerId);
+                // If there’s still work, chain another delayed flush
+                var q = QUEUE.get(playerId);
+                if (q != null && !q.isEmpty()) {
+                    // re-schedule to spread work
+                    scheduleFlush(playerId, world);
+                }
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------------
+    // Flushing (partial or full)
+    // ------------------------------------------------------------------------
+
+    private static void flushNow(ServerPlayerEntity player, ServerWorld world, boolean full) {
+        var q = QUEUE.get(player.getUuid());
         if (q == null || q.isEmpty()) return;
 
+        var cm = world.getChunkManager();
+        var rng = player.getRandom();
+
+        // Chance is based on current level at time of flush
         HerbalismConfig cfg = ConfigManager.getSkillConfig(SkillType.HERBALISM);
-        long totalXp = McRPG.getStore().get(player.getUuid()).xp.get(SkillType.HERBALISM);
+        long totalXp = McRPG.getStore().get(player).xp.get(SkillType.HERBALISM);
         int lvl = Leveling.levelFromTotalXp(totalXp);
 
         double chance = Leveling.getScaledPercentage(
@@ -46,22 +113,20 @@ public final class GreenTerra {
                 lvl
         );
 
-        var rng = player.getRandom();
-        var world = player.getEntityWorld();
-        var cm = world.getChunkManager();
-
-        int attempts = q.size();
         int replanted = 0;
 
         while (!q.isEmpty()) {
             var c = q.pollFirst();
             var pos = c.pos();
 
-            if (!cm.isChunkLoaded(pos.getX(), pos.getZ())) continue;
+            // chunk check: be sure to use chunk coords or pos overload
+            int cx = pos.getX() >> 4;
+            int cz = pos.getZ() >> 4;
+            if (!cm.isChunkLoaded(cx, cz)) continue;
             if (rng.nextDouble() > chance) continue;
 
             var cur = world.getBlockState(pos);
-            if (!cur.isAir() && !cur.isReplaceable()) continue;
+            if (!(cur.isAir() || cur.isReplaceable())) continue;
 
             if (!canPlaceSeedling(world, pos, c.seedling())) continue;
 
@@ -71,29 +136,8 @@ public final class GreenTerra {
         }
 
         if (replanted > 0) {
-            McRPG.getLogger().debug(
-                    "Green Terra replanted {}/{} crops for {}",
-                    replanted, attempts, player.getName().getString()
-            );
-        }
-    }
-
-    /**
-     * Called from Herbalism.onCropBroken (only if fully grown).
-     */
-    public static void considerReplant(ServerPlayerEntity player, BlockPos pos, BlockState brokenState) {
-        var q = QUEUE.get(player.getUuid());
-        if (q == null) return; // not active
-
-        var world = player.getEntityWorld();
-
-        // Try each replanter in order; first match wins.
-        for (var r : REPLANTERS) {
-            var seed = r.seedling(world, pos, brokenState);
-            if (seed.isPresent()) {
-                q.add(new ReplantCandidate(pos.toImmutable(), seed.get()));
-                return;
-            }
+            McRPG.getLogger().debug("Green Terra replanted {} crops for {}",
+                    replanted, player.getName().getString());
         }
     }
 

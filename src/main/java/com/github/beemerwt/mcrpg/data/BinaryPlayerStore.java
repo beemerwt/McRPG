@@ -1,6 +1,8 @@
 package com.github.beemerwt.mcrpg.data;
 
+import com.github.beemerwt.mcrpg.McRPG;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.server.network.ServerPlayerEntity;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
@@ -19,7 +21,7 @@ public final class BinaryPlayerStore implements PlayerStore, Closeable {
     private static final short HEADER_SIZE= 8;
     private static final byte REC_PLAYER  = 1;
 
-    // TLV tags for v3
+    private static final byte TAG_PLAYER_NAME   = 0x01;
     private static final byte TAG_SKILL_XP      = 0x10;
 
     private final Path dbPath = FabricLoader.getInstance().getConfigDir()
@@ -28,6 +30,7 @@ public final class BinaryPlayerStore implements PlayerStore, Closeable {
     private final RandomAccessFile raf;
     private final FileChannel chan;
 
+    private final Map<String, UUID> nameIndex = new HashMap<>(); // lower-case name -> UUID
     private final Map<UUID, PlayerData> cache = new HashMap<>();
     private final Map<UUID, Long> latestOffset = new HashMap<>();
 
@@ -53,17 +56,83 @@ public final class BinaryPlayerStore implements PlayerStore, Closeable {
     }
 
     @Override
-    public synchronized @NotNull PlayerData get(UUID id) {
-        var pd = cache.get(id);
-        if (pd != null) return pd;
-        var off = latestOffset.get(id);
-        if (off != null) {
-            var loaded = readAt(off);
-            if (loaded != null) { cache.put(id, loaded); return loaded; }
+    public synchronized @NotNull PlayerData get(ServerPlayerEntity player) {
+        UUID id = player.getUuid();
+        PlayerData pd = cache.get(id);
+        if (pd != null) {
+            // If name changed (rare, but happens), update in-memory and persist on next save
+            String curName = player.getGameProfile().name();
+            if (curName != null && !curName.equals(pd.name)) {
+                // Reindex
+                if (!pd.name.isEmpty()) nameIndex.remove(pd.name.toLowerCase(Locale.ROOT));
+                nameIndex.put(curName.toLowerCase(Locale.ROOT), id);
+                // Replace cached PD with updated name but same XP
+                PlayerData upd = new PlayerData(curName, id);
+                upd.xp.putAll(pd.xp);
+                cache.put(id, upd);
+            }
+            return cache.get(id);
         }
-        pd = new PlayerData(id);
+
+        Long off = latestOffset.get(id);
+        if (off != null) {
+            PlayerData loaded = readAt(off);
+            if (loaded != null) {
+                cache.put(id, loaded);
+                if (!loaded.name.isEmpty()) nameIndex.put(loaded.name.toLowerCase(Locale.ROOT), id);
+                return loaded;
+            }
+        }
+
+        String name = Optional.ofNullable(player.getGameProfile().name()).orElse("");
+        pd = new PlayerData(name, id);
         cache.put(id, pd);
+        if (!name.isEmpty()) nameIndex.put(name.toLowerCase(Locale.ROOT), id);
         return pd;
+    }
+
+    public synchronized @NotNull PlayerData get(UUID id) {
+        PlayerData pd = cache.get(id);
+        if (pd != null) return pd;
+
+        Long off = latestOffset.get(id);
+        if (off != null) {
+            PlayerData loaded = readAt(off);
+            if (loaded != null) {
+                cache.put(id, loaded);
+                if (!loaded.name.isEmpty()) nameIndex.put(loaded.name.toLowerCase(Locale.ROOT), id);
+                return loaded;
+            }
+        }
+        // Unknown/offline with no record yet
+        PlayerData blank = new PlayerData("", id);
+        cache.put(id, blank);
+        return blank;
+    }
+
+    @Override
+    public Optional<PlayerData> lookup(String name) {
+        if (name == null || name.isEmpty()) return Optional.empty();
+
+        // 0) Our persisted name index (case-insensitive)
+        UUID byIndex = nameIndex.get(name.toLowerCase(Locale.ROOT));
+        if (byIndex != null) return Optional.of(get(byIndex));
+
+        // 1) Online players (lets the server resolve the exact player if online)
+        var server = McRPG.getServer();
+        if (server != null) {
+            var pm = server.getPlayerManager();
+            var online = pm.getPlayer(name);
+            if (online != null) return Optional.of(get(online.getUuid()));
+        }
+
+        // 2) UUID string support (if caller passed a UUID literal)
+        try {
+            UUID asUuid = UUID.fromString(name);
+            if (latestOffset.containsKey(asUuid)) return Optional.of(get(asUuid));
+        } catch (IllegalArgumentException ignored) {}
+
+        return Optional.empty();
     }
 
     @Override
@@ -77,10 +146,11 @@ public final class BinaryPlayerStore implements PlayerStore, Closeable {
 
     @Override
     public synchronized void save(UUID id) {
-        var pd = cache.get(id);
+        PlayerData pd = cache.get(id);
         if (pd == null) return;
         long off = appendRecord(pd);
         latestOffset.put(id, off);
+        if (!pd.name.isEmpty()) nameIndex.put(pd.name.toLowerCase(Locale.ROOT), id);
     }
 
     @Override
@@ -189,6 +259,7 @@ public final class BinaryPlayerStore implements PlayerStore, Closeable {
             latestOffset.put(id, recordStart);
             var pd = parsePayload(id, payload);
             cache.put(id, pd);
+            if (!pd.name.isEmpty()) nameIndex.put(pd.name.toLowerCase(Locale.ROOT), id);
 
             pos = nextPos;
         }
@@ -244,46 +315,54 @@ public final class BinaryPlayerStore implements PlayerStore, Closeable {
     //   [tag u8][len u32][payload ...len bytes...]
     // TAG_SKILL_XP payload:  [id u2][xp i64]
     // TAG_ABILITY_WIN payload:[id u2][cooldown i64][active i64]
+    // v3 layout lead-in already read before calling this: time, uuidMost, uuidLeast
     private PlayerData parsePayloadV1(UUID id, ByteBuffer p) {
-        PlayerData pd = new PlayerData(id);
         int pdSize = p.getInt();
         int startPos = p.position();
         int endPos = startPos + pdSize;
 
+        String name = "";
+        EnumMap<SkillType, Long> xpTmp = new EnumMap<>(SkillType.class);
+
         while (p.position() < endPos) {
-            if (endPos - p.position() < 5) { // need tag(1) + len(4)
-                p.position(endPos);
-                break;
-            }
+            if (endPos - p.position() < 5) { p.position(endPos); break; }
             byte tag = p.get();
             int len = p.getInt();
             int bodyStart = p.position();
             int bodyEnd = bodyStart + len;
-            if (bodyEnd > endPos || len < 0) { // corrupt; bail out of this entry
-                p.position(endPos);
-                break;
-            }
+            if (bodyEnd > endPos || len < 0) { p.position(endPos); break; }
 
             try {
                 switch (tag) {
-                    case TAG_SKILL_XP -> {
-                        short skillId = p.getShort();
-                        long xp = p.getLong();
-
-                        SkillType s = safeSkill(skillId);
-                        if (s != null) pd.xp.put(s, xp);
+                    case TAG_PLAYER_NAME: {
+                        // UTF-8 bytes of the name
+                        byte[] bytes = new byte[len];
+                        p.get(bytes);
+                        name = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+                        continue; // we already advanced
                     }
-                    default -> {
-                        // Unknown tag: skip
-                        p.position(bodyEnd);
+                    case TAG_SKILL_XP: {
+                        if (len >= 10) { // short + long
+                            short skillId = p.getShort();
+                            long xp = p.getLong();
+                            SkillType s = safeSkill(skillId);
+                            if (s != null) xpTmp.put(s, xp);
+                        }
+                        break;
                     }
+                    default:
+                        // skip unknown
+                        break;
                 }
             } finally {
-                // Ensure we land exactly on bodyEnd even if a branch under-read
                 p.position(bodyEnd);
             }
         }
-        // If future fields follow TLVs, they can be read here without breaking older readers.
+
+        PlayerData pd = new PlayerData(name == null ? "" : name, id);
+        if (!xpTmp.isEmpty()) {
+            for (var e : xpTmp.entrySet()) pd.xp.put(e.getKey(), e.getValue());
+        }
         return pd;
     }
 
@@ -326,21 +405,24 @@ public final class BinaryPlayerStore implements PlayerStore, Closeable {
         }
     }
 
-    // Build v3 payload per the variable TLV structure
     private byte[] buildPayloadV1(PlayerData pd) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream(256);
              DataOutputStream out = new DataOutputStream(baos)) {
 
-            // Common fixed header
             out.writeLong(System.currentTimeMillis());
             out.writeLong(pd.uuid.getMostSignificantBits());
             out.writeLong(pd.uuid.getLeastSignificantBits());
 
-            // We will buffer the TLV region to compute PD_SIZE
             ByteArrayOutputStream tlvBaos = new ByteArrayOutputStream(128);
             DataOutputStream tlv = new DataOutputStream(tlvBaos);
 
-            // SKILL_XP entries (only those present; you can switch to all Skills if you prefer)
+            // NAME first (optional but recommended)
+            if (pd.name != null) {
+                byte[] nameBytes = pd.name.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                putTLV(tlv, TAG_PLAYER_NAME, nameBytes);
+            }
+
+            // SKILL_XP entries
             for (var e : pd.xp.entrySet()) {
                 SkillType s = e.getKey();
                 long xp = e.getValue();
@@ -351,7 +433,6 @@ public final class BinaryPlayerStore implements PlayerStore, Closeable {
             tlv.flush();
             byte[] tlvBytes = tlvBaos.toByteArray();
 
-            // PD_SIZE
             out.writeInt(tlvBytes.length);
             out.write(tlvBytes);
 

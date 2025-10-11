@@ -1,4 +1,4 @@
-package com.github.beemerwt.mcrpg.skills.ability;
+package com.github.beemerwt.mcrpg.abilities;
 
 import com.github.beemerwt.mcrpg.config.skills.ExcavationConfig;
 import net.minecraft.block.Block;

@@ -6,16 +6,17 @@ import com.github.beemerwt.mcrpg.config.SkillConfig;
 import com.github.beemerwt.mcrpg.config.SuperAbilityConfig;
 import com.github.beemerwt.mcrpg.data.ActiveAbilityType;
 import com.github.beemerwt.mcrpg.data.PlayerData;
-import com.github.beemerwt.mcrpg.skills.ability.GigaDrillBreaker;
-import com.github.beemerwt.mcrpg.skills.ability.GreenTerra;
-import com.github.beemerwt.mcrpg.skills.ability.SuperBreaker;
+import com.github.beemerwt.mcrpg.abilities.GigaDrillBreaker;
+import com.github.beemerwt.mcrpg.abilities.GreenTerra;
+import com.github.beemerwt.mcrpg.abilities.SuperBreaker;
+import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.text.Component;
 import com.github.beemerwt.mcrpg.text.NamedTextColor;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
 import com.github.beemerwt.mcrpg.util.Messenger;
 import com.github.beemerwt.mcrpg.util.SoundUtil;
 import com.github.beemerwt.mcrpg.util.TickScheduler;
-import com.github.beemerwt.mcrpg.xp.Leveling;
+import com.github.beemerwt.mcrpg.util.Leveling;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -160,10 +161,10 @@ public final class AbilityManager {
         if (!(abilityCfg instanceof SuperAbilityConfig superAbility))
             return;
 
-        PlayerData data = McRPG.getStore().get(player.getUuid());
+        PlayerData data = McRPG.getStore().get(player);
         if (data == null) return; // Should not happen, but be safe.
 
-        int level = Leveling.levelFromTotalXp(data.xp.getOrDefault(skillCfg.getSkillType(), 0L));
+        int level = Leveling.getLevel(player, SkillType.MINING);
         long durationTicks = Leveling.getScaledTicks(superAbility.baseDuration, superAbility.maxDuration, level);
         long cooldownTicks = Leveling.getScaledTicks(superAbility.baseCooldown, superAbility.minCooldown, level);
         cooldownTicks += durationTicks; // cooldown starts after duration ends
@@ -206,7 +207,7 @@ public final class AbilityManager {
         SoundUtil.playSound(player, SoundEvents.ITEM_TRIDENT_RIPTIDE_3.value(), 1.0f, 1.0f);
 
         long now = player.getEntityWorld().getTime();
-        McRPG.getLogger().debug("Activated {} for {} ticks (level {}), now={}, ends={}, cooldownEnds={}",
+        McRPG.getLogger().debug("Activated {} for {} ticks ({} seconds) level={}, now={}, ends={}, cooldownEnds={}",
                 activeAbilityType.getDisplayName(), durationTicks, level, now, now + durationTicks, now + cooldownTicks);
     }
 

@@ -1,5 +1,6 @@
-package com.github.beemerwt.mcrpg.data;
+package com.github.beemerwt.mcrpg.persistent;
 
+import com.github.beemerwt.mcrpg.McRPG;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
@@ -11,35 +12,34 @@ import net.minecraft.world.PersistentStateManager;
 import net.minecraft.world.PersistentStateType;
 
 import java.util.ArrayList;
-import java.util.List;
 
 public final class CropMarkers extends PersistentState {
     private static final String KEY = "mcrpg_herbalism_markers";
     private final Long2FloatOpenHashMap posToMultiplier = new Long2FloatOpenHashMap();
 
+    private record Entry(long pos, float mult) {}
+    private static final Codec<Entry> ENTRY_CODEC = RecordCodecBuilder.create(inst ->
+            inst.group(
+                    Codec.LONG.fieldOf("pos").forGetter(Entry::pos),
+                    Codec.FLOAT.fieldOf("mult").forGetter(Entry::mult)
+            ).apply(inst, Entry::new)
+    );
+
     private static final Codec<CropMarkers> CODEC = RecordCodecBuilder.create(inst ->
             inst.group(
-                    Codec.LONG.listOf().fieldOf("positions").forGetter(m -> {
-                        long[] keys = m.posToMultiplier.keySet().toLongArray();
-                        List<Long> out = new ArrayList<>(keys.length);
-                        for (long k : keys) out.add(k);
-                        return out;
-                    }),
-                    Codec.FLOAT.listOf().fieldOf("multipliers").forGetter(m -> {
-                        long[] keys = m.posToMultiplier.keySet().toLongArray();
-                        List<Float> out = new ArrayList<>(keys.length);
-                        for (long k : keys) out.add(m.posToMultiplier.get(k));
+                    ENTRY_CODEC.listOf().fieldOf("entries").forGetter(m -> {
+                        var out = new ArrayList<Entry>(m.posToMultiplier.size());
+                        for (var it = m.posToMultiplier.long2FloatEntrySet().fastIterator(); it.hasNext();) {
+                            var e = it.next();
+                            out.add(new Entry(e.getLongKey(), e.getFloatValue()));
+                        }
                         return out;
                     })
-            ).apply(inst, (positions, multipliers) -> {
+            ).apply(inst, entries -> {
                 CropMarkers m = new CropMarkers();
-                int len = Math.min(positions.size(), multipliers.size());
-                for (int i = 0; i < len; i++) {
-                    long pos = positions.get(i);
-                    float f = clampMultiplier(multipliers.get(i));
-                    if (f > 1.0f) {
-                        m.posToMultiplier.put(pos, f);
-                    }
+                for (Entry e : entries) {
+                    float f = clampMultiplier(e.mult());
+                    if (f > 1.0f) m.posToMultiplier.put(e.pos(), f);
                 }
                 return m;
             })
@@ -77,7 +77,9 @@ public final class CropMarkers extends PersistentState {
     }
 
     public void unmark(ServerWorld world, BlockPos pos) {
-        if (posToMultiplier.remove(pos.asLong()) != 0) {
+        long k = pos.asLong();
+        if (posToMultiplier.containsKey(k)) {
+            posToMultiplier.remove(k);
             markDirty();
         }
     }
@@ -88,10 +90,19 @@ public final class CropMarkers extends PersistentState {
         }
     }
 
+    public int size() {
+        return posToMultiplier.size();
+    }
+
+    public boolean containsKey(long key) {
+        return posToMultiplier.containsKey(key);
+    }
+
     private static float clampMultiplier(float f) {
-        if (Float.isNaN(f)) return 1.0f;
-        if (f < 1.0f) return 1.0f;
-        if (f > 16.0f) return 16.0f; // hard cap, just in case
-        return f;
+        if (Float.isNaN(f)) {
+            McRPG.getLogger().warning("Attempted to set NaN Green Thumb multiplier");
+            return 1.0f;
+        }
+        return Math.max(0.0f, Math.min(f, 16.0f)); // hard cap, just in case
     }
 }

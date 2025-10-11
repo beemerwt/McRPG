@@ -1,6 +1,6 @@
 package com.github.beemerwt.mcrpg.command;
 
-import com.github.beemerwt.mcrpg.xp.Leveling;
+import com.github.beemerwt.mcrpg.util.Leveling;
 import com.github.beemerwt.mcrpg.data.PlayerStore;
 import com.github.beemerwt.mcrpg.permission.Permissions;
 import com.github.beemerwt.mcrpg.data.SkillType;
@@ -73,8 +73,7 @@ public final class SkillCommand {
         Arrays.stream(SkillType.values())
                 .sorted(Comparator.comparing(Enum::name))
                 .forEach(skill -> {
-                    long totalXp = data.xp.getOrDefault(skill, 0L);
-                    Progress p = progress(totalXp);
+                    Progress p = progress(uuid, skill);
 
                     // Line per skill
                     MutableText line = Text.literal(String.format("%-12s ", title(skill)))
@@ -96,9 +95,11 @@ public final class SkillCommand {
     /**
      * Compute level and in-level progress from a total XP using the global curve.
      */
-    private static Progress progress(long totalXp) {
-        int lvl = Leveling.levelFromTotalXp(totalXp);
+    private static Progress progress(UUID player, SkillType skill) {
+        int lvl = Leveling.getLevel(player, skill);
+        long totalXp = Leveling.getTotalXp(player, skill);
         long needThis = Leveling.xpForLevel(lvl + 1);
+
         long spentBefore = sumNeededUpTo(lvl);
         long inLevel = Math.max(0, totalXp - spentBefore);
         // guard against odd curves

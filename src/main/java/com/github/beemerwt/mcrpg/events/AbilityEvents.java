@@ -4,7 +4,10 @@ import com.github.beemerwt.mcrpg.McRPG;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.data.ActiveAbilityType;
 import com.github.beemerwt.mcrpg.managers.AbilityManager;
+import com.github.beemerwt.mcrpg.skills.Repair;
+import com.github.beemerwt.mcrpg.skills.Salvage;
 import com.github.beemerwt.mcrpg.skills.Woodcutting;
+import com.github.beemerwt.mcrpg.util.BlockClassifier;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
@@ -16,6 +19,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -23,7 +27,6 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class AbilityEvents {
-
     public static void register() {
         UseBlockCallback.EVENT.register(AbilityEvents::onPlayerUse);
         UseItemCallback.EVENT.register((player, world, hand) ->
@@ -38,10 +41,31 @@ public class AbilityEvents {
                                            @Nullable BlockHitResult hitResult)
     {
         if (world.isClient()) return ActionResult.PASS;
+        if (!(world instanceof ServerWorld sw)) return ActionResult.PASS;
         if (!(player instanceof ServerPlayerEntity sp)) return ActionResult.PASS;
-        if (!player.isSneaking()) return ActionResult.PASS;
+        if (hand == Hand.OFF_HAND) return ActionResult.PASS;
+        if (player.isSneaking()) return readyAbility(sp);
 
-        var handItem = player.getMainHandStack().getItem();
+        if (hitResult == null) return ActionResult.PASS;
+
+        var state = world.getBlockState(hitResult.getBlockPos());
+        if (state == null) return ActionResult.PASS;
+
+        var block = state.getBlock();
+        if (BlockClassifier.isGoldBlock(block))
+            return Salvage.onPlayerUse(sp, sw);
+
+        if (BlockClassifier.isIronBlock(block))
+            return Repair.onPlayerUse(sp, sw);
+
+        return ActionResult.PASS;
+    }
+
+    private static ActionResult readyAbility(ServerPlayerEntity sp) {
+        McRPG.getLogger().debug("AbilityEvents: onPlayerUse: Player {}",
+                sp.getName().getString());
+
+        var handItem = sp.getMainHandStack().getItem();
 
         if (ItemClassifier.isShovel(handItem) && AbilityManager.canActivate(sp, ActiveAbilityType.GIGA_DRILL_BREAKER))
         {

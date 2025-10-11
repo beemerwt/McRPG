@@ -8,6 +8,11 @@ public enum SkillType {
     ACROBATICS((short) 3),
     HERBALISM((short) 8),
 
+    // Artisan Skills
+    SMELTING((short) 9),
+    REPAIR((short) 10),
+    SALVAGE((short) 11),
+
     // Combat-specific
     SWORDS((short) 4),
     ARCHERY((short) 5),

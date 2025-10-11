@@ -2,23 +2,23 @@ package com.github.beemerwt.mcrpg;
 
 import com.github.beemerwt.mcrpg.command.AdminCommand;
 import com.github.beemerwt.mcrpg.command.SkillCommand;
+import com.github.beemerwt.mcrpg.events.*;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.data.BinaryPlayerStore;
 import com.github.beemerwt.mcrpg.data.PlayerStore;
-import com.github.beemerwt.mcrpg.events.AbilityEvents;
-import com.github.beemerwt.mcrpg.events.BlockEvents;
-import com.github.beemerwt.mcrpg.events.CombatEvents;
-import com.github.beemerwt.mcrpg.events.MovementEvents;
 import com.github.beemerwt.mcrpg.managers.AbilityManager;
+import com.github.beemerwt.mcrpg.skills.Acrobatics;
+import com.github.beemerwt.mcrpg.skills.Smelting;
 import com.github.beemerwt.mcrpg.ui.HealthbarHover;
 import com.github.beemerwt.mcrpg.ui.XpBossbarManager;
 import com.github.beemerwt.mcrpg.util.FabricLogger;
-import net.fabricmc.api.DedicatedServerModInitializer;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
 
-public class McRPG implements DedicatedServerModInitializer {
+public class McRPG implements ModInitializer {
     private static final FabricLogger LOG = FabricLogger.getLogger("mcMMO-Fabric");
     public static FabricLogger getLogger() { return LOG; }
 
@@ -28,7 +28,14 @@ public class McRPG implements DedicatedServerModInitializer {
     private long lastSave = 0;
 
     @Override
-    public void onInitializeServer() {
+    public void onInitialize() {
+        ServerLifecycleEvents.SERVER_STARTED.register(s -> {
+            LOG.debug("Server started {}", s.getVersion());
+            server = s;
+        });
+
+        ServerLifecycleEvents.SERVER_STOPPED.register(s -> server = null);
+
         LOG.info("Initializing");
         ConfigManager.init();            // loads defaults + overrides
         AbilityManager.init();
@@ -37,13 +44,25 @@ public class McRPG implements DedicatedServerModInitializer {
         BlockEvents.register();
         AbilityEvents.register();
         CombatEvents.register();
-        MovementEvents.register();
 
         SkillCommand.register(store);
         AdminCommand.register(store);
 
         XpBossbarManager.init(); // <--- add this line
         HealthbarHover.init();
+
+        Acrobatics.register();
+        Smelting.register();
+
+        ServerPlayerEvents.JOIN.register(player -> {
+            // On player join:
+            var pd = store.get(player); // ensures cached PD
+            String cur = player.getGameProfile().name();
+            if (cur != null && !cur.equals(pd.name)) {
+                // update cached PD and nameIndex (as shown in the previous message)
+                store.save(player.getUuid()); // optional: persist immediately
+            }
+        });
 
         lastSave = System.currentTimeMillis();
         ServerTickEvents.END_SERVER_TICK.register(minecraftServer -> {

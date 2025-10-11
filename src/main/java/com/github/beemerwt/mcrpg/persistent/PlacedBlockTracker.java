@@ -1,4 +1,4 @@
-package com.github.beemerwt.mcrpg.data;
+package com.github.beemerwt.mcrpg.persistent;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;

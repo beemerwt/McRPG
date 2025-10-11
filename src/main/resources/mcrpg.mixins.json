@@ -4,8 +4,12 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "BlockOnPlacedMixin",
-    "DamageTrackerAccessor",
-    "HerbalismRandomTickMixin"
+    "CropBlockTickMixin",
+    "ScreenHandlerMixin",
+    "AbstractFurnaceScreenHandlerMixin",
+    "AbstractFurnaceBlockEntityMixin",
+    "access.DamageTrackerAccessor",
+    "access.CropBlockInvoker"
   ],
   "injectors": { "defaultRequire": 1 }
 }

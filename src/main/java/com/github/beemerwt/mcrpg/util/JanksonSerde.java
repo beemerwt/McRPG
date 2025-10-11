@@ -33,6 +33,12 @@ public final class JanksonSerde {
                 f.setAccessible(true);
                 String key = keyFor(f);
                 Object val = getFieldValue(pojo, f);
+
+                // NEW: omit optional default/empty values on write
+                if (f.isAnnotationPresent(JankOptional.class) && isDefaulty(val, f.getType())) {
+                    continue;
+                }
+
                 JsonElement el = toElement(val);
                 out.put(key, el);
                 if (f.isAnnotationPresent(JankComment.class))
@@ -52,7 +58,26 @@ public final class JanksonSerde {
             if (!shouldInclude(f)) continue;
             String key = keyFor(f);
             JsonElement raw = obj.get(key);
-            if (raw == null || raw instanceof JsonNull) continue; // keep default
+
+            if (raw == null || raw instanceof JsonNull) {
+                // If explicitly required, complain
+                JankProperty prop = f.getAnnotation(JankProperty.class);
+                boolean required = (prop != null && prop.required());
+
+                // If the field is optional, missing is fine
+                if (f.isAnnotationPresent(JankOptional.class)) {
+                    continue; // keep in-class default
+                }
+
+                if (required) {
+                    throw new IllegalStateException("Missing required key '" + key
+                            + "' for " + type.getName());
+                }
+
+                // Not required and not optional -> keep default
+                continue;
+            }
+
             setFieldValueFromJson(instance, f, raw);
         }
         return instance;
@@ -108,6 +133,30 @@ public final class JanksonSerde {
             stack.push(c);
         }
         return new ArrayList<>(stack); // base first
+    }
+
+    private static boolean isDefaulty(Object v, Class<?> t) {
+        if (v == null) return true;
+
+        if (t.isPrimitive()) {
+            if (t == boolean.class) return !((Boolean) v);
+            if (t == byte.class) return ((Byte) v) == 0;
+            if (t == short.class) return ((Short) v) == 0;
+            if (t == int.class) return ((Integer) v) == 0;
+            if (t == long.class) return ((Long) v) == 0L;
+            if (t == float.class) return ((Float) v) == 0.0f;
+            if (t == double.class) return ((Double) v) == 0.0d;
+            if (t == char.class) return ((Character) v) == '\0';
+            return false;
+        }
+
+        if (v instanceof String s) return s.isEmpty();
+        if (v instanceof Collection<?> c) return c.isEmpty();
+        if (v instanceof Map<?, ?> m) return m.isEmpty();
+        if (t.isArray()) return Array.getLength(v) == 0;
+
+        // For enums and nested @JanksonObject, only null is "defaulty" (handled above).
+        return false;
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })

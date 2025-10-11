@@ -1,9 +1,9 @@
-package com.github.beemerwt.mcrpg.skills.ability;
+package com.github.beemerwt.mcrpg.abilities;
 
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.MiningConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
-import com.github.beemerwt.mcrpg.xp.Leveling;
+import com.github.beemerwt.mcrpg.util.Leveling;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import net.minecraft.entity.attribute.EntityAttribute;

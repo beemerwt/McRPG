@@ -70,10 +70,12 @@ public final class ConfigManager {
         BY_SKILL.put(SkillType.HERBALISM, SkillConfig.createOrLoadConfig(SkillType.HERBALISM));
 
         // Artisan skill
-        // BY_SKILL.put(SkillType.REPAIR, SkillConfig.createOrLoadConfig(SkillType.REPAIR));
+        BY_SKILL.put(SkillType.SMELTING, SkillConfig.createOrLoadConfig(SkillType.SMELTING));
+        BY_SKILL.put(SkillType.REPAIR, SkillConfig.createOrLoadConfig(SkillType.REPAIR));
+        BY_SKILL.put(SkillType.SALVAGE, SkillConfig.createOrLoadConfig(SkillType.SALVAGE));
+
         // BY_SKILL.put(SkillType.FISHING, SkillConfig.createOrLoadConfig(SkillType.FISHING));
         // BY_SKILL.put(SkillType.ALCHEMY, SkillConfig.createOrLoadConfig(SkillType.ALCHEMY));
-        // BY_SKILL.put(SkillType.SMITHING, SkillConfig.createOrLoadConfig(SkillType.SMITHING));
 
         // Combat skills
         BY_SKILL.put(SkillType.SWORDS, SkillConfig.createOrLoadConfig(SkillType.SWORDS));

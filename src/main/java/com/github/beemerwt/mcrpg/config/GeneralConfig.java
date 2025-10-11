@@ -18,8 +18,9 @@ public class GeneralConfig extends Config {
                 """)
         public String base = "linear";
 
-        @JankComment("Used only if base is 'linear'. XP needed = linearPerLevel * L")
-        public long linearPerLevel = 500;
+        @JankComment("Used only if base is 'linear'. XP needed = base + (level * multiplier)")
+        public long linearBase = 1020;
+        public long multiplier = 20;
 
         @JankComment("Used only if base is 'quad'. XP needed = a*L^2 + b*L + c")
         public int quadA = 25;

@@ -4,10 +4,12 @@ import com.github.beemerwt.mcrpg.McRPG;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.AcrobaticsConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
-import com.github.beemerwt.mcrpg.xp.Leveling;
+import com.github.beemerwt.mcrpg.util.Leveling;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.network.ServerPlayerEntity;
 
@@ -15,6 +17,16 @@ import java.util.Set;
 
 public class Acrobatics {
     private Acrobatics() {}
+
+    public static void register() {
+        ServerLivingEntityEvents.AFTER_DAMAGE.register((livingEntity, damageSource,
+                                                        amount, v1, b) ->
+        {
+            if (!(livingEntity instanceof ServerPlayerEntity player)) return;
+            if (!damageSource.isOf(DamageTypes.FALL)) return;
+            Acrobatics.onFallDamage(player, amount);
+        });
+    }
 
     public static void onFallDamage(ServerPlayerEntity player, float damageTaken) {
         AcrobaticsConfig cfg = ConfigManager.getSkillConfig(SkillType.ACROBATICS);

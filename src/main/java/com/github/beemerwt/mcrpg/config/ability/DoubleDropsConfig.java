@@ -10,6 +10,6 @@ public class DoubleDropsConfig {
     public boolean enabled = true;
 
     @JankComment("Percentage chance to trigger, scaling with skill level")
-    public double baseChance = 0.0;
-    public double maxChance = 100.0;
+    public float baseChance = 0.0f;
+    public float maxChance = 100.0f;
 }

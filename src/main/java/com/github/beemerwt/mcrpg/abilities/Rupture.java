@@ -1,4 +1,4 @@
-package com.github.beemerwt.mcrpg.skills.ability;
+package com.github.beemerwt.mcrpg.abilities;
 
 public class Rupture {
 

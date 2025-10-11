@@ -6,13 +6,13 @@ import com.github.beemerwt.mcrpg.config.skills.WoodcuttingConfig;
 import com.github.beemerwt.mcrpg.data.ActiveAbilityType;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.managers.AbilityManager;
-import com.github.beemerwt.mcrpg.skills.ability.DoubleDrops;
-import com.github.beemerwt.mcrpg.skills.ability.LeafBlower;
-import com.github.beemerwt.mcrpg.skills.ability.TreeFeller;
+import com.github.beemerwt.mcrpg.abilities.DoubleDrops;
+import com.github.beemerwt.mcrpg.abilities.LeafBlower;
+import com.github.beemerwt.mcrpg.abilities.TreeFeller;
 import com.github.beemerwt.mcrpg.util.BlockClassifier;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
-import com.github.beemerwt.mcrpg.xp.Leveling;
-import net.minecraft.block.Block;
+import com.github.beemerwt.mcrpg.util.Leveling;
+import net.minecraft.block.BlockState;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -30,15 +30,19 @@ public class Woodcutting {
         LeafBlower.processBlock(player, world, pos, state);
     }
 
-    public static void onLogChopped(ServerPlayerEntity player, BlockPos pos,
-                                    Block block, List<ItemStack> drops) {
+    public static void onLogChopped(ServerPlayerEntity player,
+                                    ServerWorld world,
+                                    BlockPos pos,
+                                    BlockState state,
+                                    List<ItemStack> drops)
+    {
         WoodcuttingConfig cfg = ConfigManager.getSkillConfig(SkillType.WOODCUTTING);
+        var block = state.getBlock();
         long blockXp = Leveling.resolveBlockXp(cfg.getBlocks(), block);
         if (blockXp <= 0) return;
 
-        var data = McRPG.getStore().get(player.getUuid());
+        var data = McRPG.getStore().get(player);
         int level = Leveling.levelFromTotalXp(data.xp.get(SkillType.WOODCUTTING));
-        var world = player.getEntityWorld(); // or player.getServerWorld()
 
         // Only trigger abilities when using an axe
         if (ItemClassifier.isAxe(player.getMainHandStack().getItem())) {

@@ -4,21 +4,30 @@ import com.github.beemerwt.mcrpg.McRPG;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.ExcavationConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
-import com.github.beemerwt.mcrpg.skills.ability.TreasureFinding;
+import com.github.beemerwt.mcrpg.abilities.TreasureFinding;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
-import com.github.beemerwt.mcrpg.xp.Leveling;
-import net.minecraft.block.Block;
+import com.github.beemerwt.mcrpg.util.Leveling;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import org.joml.Math;
 
+import java.util.List;
+
 public class Excavation {
 
-    public static void onBlockDug(ServerPlayerEntity player, BlockPos pos, Block block)
+    public static void onBlockDug(ServerPlayerEntity player,
+                                  ServerWorld world,
+                                  BlockPos pos,
+                                  BlockState state,
+                                  List<ItemStack> drops)
     {
         ExcavationConfig cfg = ConfigManager.getSkillConfig(SkillType.EXCAVATION);
-        var data = McRPG.getStore().get(player.getUuid());
+        var data = McRPG.getStore().get(player);
         var blocks = cfg.getBlocks();
+        var block = state.getBlock();
 
         long blockXp = Leveling.resolveBlockXp(blocks, block);
         if (blockXp <= 0) return;

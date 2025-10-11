@@ -5,7 +5,7 @@
   "name": "McRPG",
   "environment": "server",
   "entrypoints": {
-    "server": [ "com.github.beemerwt.mcrpg.McRPG" ]
+    "main": [ "com.github.beemerwt.mcrpg.McRPG" ]
   },
   "mixins": [ "mcrpg.mixins.json" ],
   "depends": {

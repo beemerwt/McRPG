@@ -1,5 +1,6 @@
 package com.github.beemerwt.mcrpg.text;
 
+import net.minecraft.text.TextColor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -178,6 +179,10 @@ public record NamedTextColor(String name, int value) {
 
         VALUES.add(this);
         NAMES.put(name, this);
+    }
+
+    public TextColor asTextColor() {
+        return TextColor.fromRgb(this.value);
     }
 
     @Override

@@ -4,13 +4,14 @@ import com.github.beemerwt.mcrpg.McRPG;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.MiningConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
-import com.github.beemerwt.mcrpg.skills.ability.DoubleDrops;
+import com.github.beemerwt.mcrpg.abilities.DoubleDrops;
 import com.github.beemerwt.mcrpg.util.BlockClassifier;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
-import com.github.beemerwt.mcrpg.xp.Leveling;
-import net.minecraft.block.Block;
+import com.github.beemerwt.mcrpg.util.Leveling;
+import net.minecraft.block.BlockState;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import org.joml.Math;
 
@@ -20,18 +21,23 @@ public class Mining {
     private Mining() {}
 
     /**
-     * When a player mines a block, this should be called to handle mining XP and skills.
+     * Should be called when a player mines a block to handle Mining skill XP and abilities.
      * @param player The player who mined the block.
-     * @param block The block that was mined.
-     * @param vanillaDrops The drops that will be dropped by vanilla mechanics.
-     *                     Will not change original behavior.
+     * @param world The world the block was mined in.
+     * @param pos The position of the block that was mined.
+     * @param state The block state of the block that was mined.
+     * @param drops The list of item drops from the block.
      */
-    public static void onBlockMined(ServerPlayerEntity player, BlockPos pos,
-                                    Block block, List<ItemStack> vanillaDrops)
+    public static void onBlockMined(ServerPlayerEntity player,
+                                    ServerWorld world,
+                                    BlockPos pos,
+                                    BlockState state,
+                                    List<ItemStack> drops)
     {
         MiningConfig cfg = ConfigManager.getSkillConfig(SkillType.MINING);
-        var data = McRPG.getStore().get(player.getUuid());
+        var data = McRPG.getStore().get(player);
         var blocks = cfg.getBlocks();
+        var block = state.getBlock();
 
         long blockXp = Leveling.resolveBlockXp(blocks, block);
         if (blockXp <= 0) return;
@@ -43,7 +49,7 @@ public class Mining {
         var tool = player.getMainHandStack().getItem();
         if (ItemClassifier.isPickaxe(tool) && BlockClassifier.isOre(block))
             // TODO: Implement whitelist/blacklist for blocks that can trigger double drops
-            if (DoubleDrops.processTrigger(cfg.doubleDrops, level, player.getEntityWorld(), pos, block, vanillaDrops))
+            if (DoubleDrops.processTrigger(cfg.doubleDrops, level, player.getEntityWorld(), pos, block, drops))
                 blockXp *= 2; // Double the XP awarded
 
         // Apply per-skill modifier

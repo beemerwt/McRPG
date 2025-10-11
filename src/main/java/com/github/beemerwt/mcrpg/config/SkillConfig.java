@@ -64,8 +64,9 @@ public class SkillConfig extends Config {
 
             // Artisan skills
             // case FISHING -> cfg = new FishingConfig();
-            // case REPAIR -> cfg = new RepairConfig();
-            // case SMITHING -> cfg = new SmithingConfig();
+            case SMELTING -> cfg = new SmeltingConfig();
+            case REPAIR -> cfg = new RepairConfig();
+            case SALVAGE -> cfg = new SalvageConfig();
             // case ALCHEMY -> cfg = new AlchemyConfig();
 
             // Combat skills
