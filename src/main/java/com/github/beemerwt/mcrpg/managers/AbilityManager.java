@@ -16,7 +16,7 @@ import com.github.beemerwt.mcrpg.util.ItemClassifier;
 import com.github.beemerwt.mcrpg.util.Messenger;
 import com.github.beemerwt.mcrpg.util.SoundUtil;
 import com.github.beemerwt.mcrpg.util.TickScheduler;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -161,10 +161,9 @@ public final class AbilityManager {
         if (!(abilityCfg instanceof SuperAbilityConfig superAbility))
             return;
 
-        PlayerData data = McRPG.getStore().get(player);
-        if (data == null) return; // Should not happen, but be safe.
-
         int level = Leveling.getLevel(player, SkillType.MINING);
+        if (level < superAbility.minLevel) return;
+
         long durationTicks = Leveling.getScaledTicks(superAbility.baseDuration, superAbility.maxDuration, level);
         long cooldownTicks = Leveling.getScaledTicks(superAbility.baseCooldown, superAbility.minCooldown, level);
         cooldownTicks += durationTicks; // cooldown starts after duration ends

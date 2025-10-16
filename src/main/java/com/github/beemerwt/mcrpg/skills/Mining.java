@@ -7,7 +7,7 @@ import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.abilities.DoubleDrops;
 import com.github.beemerwt.mcrpg.util.BlockClassifier;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import net.minecraft.block.BlockState;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -35,15 +35,13 @@ public class Mining {
                                     List<ItemStack> drops)
     {
         MiningConfig cfg = ConfigManager.getSkillConfig(SkillType.MINING);
-        var data = McRPG.getStore().get(player);
         var blocks = cfg.getBlocks();
         var block = state.getBlock();
 
         long blockXp = Leveling.resolveBlockXp(blocks, block);
         if (blockXp <= 0) return;
 
-        var currentXp = data.xp.get(SkillType.MINING);
-        int level = Leveling.levelFromTotalXp(currentXp);
+        int level = Leveling.getLevel(player, SkillType.MINING);
 
         // Only trigger skills if the player is using a pickaxe
         var tool = player.getMainHandStack().getItem();

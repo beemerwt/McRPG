@@ -12,6 +12,7 @@ import com.github.beemerwt.mcrpg.util.ItemClassifier;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
+import net.fabricmc.fabric.impl.event.interaction.InteractionEventsRouter;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
@@ -44,24 +45,10 @@ public class AbilityEvents {
                                            @Nullable BlockHitResult hitResult)
     {
         if (world.isClient()) return ActionResult.PASS;
-        if (!(world instanceof ServerWorld sw)) return ActionResult.PASS;
         if (!(player instanceof ServerPlayerEntity sp)) return ActionResult.PASS;
         if (hand == Hand.OFF_HAND) return ActionResult.PASS;
-        if (player.isSneaking()) return readyAbility(sp);
-
-        if (hitResult == null) return ActionResult.PASS;
-
-        var state = world.getBlockState(hitResult.getBlockPos());
-        if (state == null) return ActionResult.PASS;
-
-        var block = state.getBlock();
-        if (BlockClassifier.isGoldBlock(block))
-            return Salvage.onPlayerUse(sp, sw);
-
-        if (BlockClassifier.isIronBlock(block))
-            return Repair.onPlayerUse(sp, sw);
-
-        return ActionResult.PASS;
+        if (!player.isSneaking()) return ActionResult.PASS;
+        return readyAbility(sp);
     }
 
     private static ActionResult readyAbility(ServerPlayerEntity sp) {

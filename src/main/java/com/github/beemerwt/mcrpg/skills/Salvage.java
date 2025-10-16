@@ -1,11 +1,14 @@
 package com.github.beemerwt.mcrpg.skills;
 
+import com.github.beemerwt.mcrpg.McRPG;
+import com.github.beemerwt.mcrpg.callback.PlayerEvents;
 import com.github.beemerwt.mcrpg.config.skills.SalvageConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.text.Component;
 import com.github.beemerwt.mcrpg.text.NamedTextColor;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.util.BlockClassifier;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import com.github.beemerwt.mcrpg.util.Messenger;
 import com.github.beemerwt.mcrpg.util.SoundUtil;
 import net.minecraft.enchantment.Enchantment;
@@ -18,7 +21,9 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.hit.BlockHitResult;
 
 import java.util.ArrayList;
 import java.util.Objects;
@@ -34,16 +39,44 @@ public final class Salvage {
 
     private record Pending(int slot, ItemStack snapshot, long expiresAtTick) {}
 
-    /**
-     * Called iff a player right-clicks on a gold block
-     */
-    public static ActionResult onPlayerUse(ServerPlayerEntity player, ServerWorld world) {
-        ItemStack stack = player.getMainHandStack();
-        if (stack.isEmpty() || !stack.isDamageable() || stack.getMaxDamage() <= 0) {
-            Messenger.actionBar(player, Component.text("Hold a salvageable item.", NamedTextColor.GRAY));
+    public static void register() {
+        PlayerEvents.INTERACT_ITEM.register(Salvage::onItemInteract);
+    }
+
+    private static ActionResult onItemInteract(ServerPlayerEntity player, ItemStack itemStack, Hand hand) {
+        if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
+        if (!isSalvageable(itemStack)) return ActionResult.PASS;
+
+        // Check player is looking at a gold block within reach
+        var range = player.getBlockInteractionRange();
+        var raycastResult = player.raycast(range, 0.0f, false);
+        if (!(raycastResult instanceof BlockHitResult blockHitResult)) {
+            McRPG.getLogger().debug("Repair: onItemInteract: player={}, item={}: no block in sight",
+                    player.getName().getString(),
+                    itemStack
+            );
             return ActionResult.PASS;
         }
 
+        var world = player.getEntityWorld();
+        var blockPos = blockHitResult.getBlockPos();
+        var blockState = world.getBlockState(blockPos);
+        if (blockState == null || !BlockClassifier.isGoldBlock(blockState.getBlock())) {
+            McRPG.getLogger().debug("Salvage: onItemInteract: player={}, item={}: not looking at gold block",
+                    player.getName().getString(),
+                    itemStack
+            );
+            return ActionResult.PASS;
+        }
+
+        trySalvageItem(player, world, itemStack);
+        return ActionResult.CONSUME;
+    }
+
+    /**
+     * Called iff a player right-clicks on a gold block
+     */
+    public static void trySalvageItem(ServerPlayerEntity player, ServerWorld world, ItemStack stack) {
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
         String itemKey = itemId.toString();
 
@@ -52,7 +85,7 @@ public final class Salvage {
 
         if (sv == null) {
             Messenger.actionBar(player, Component.text("This item cannot be salvaged here.", NamedTextColor.RED));
-            return ActionResult.PASS;
+            return;
         }
 
         // Level gate
@@ -60,7 +93,7 @@ public final class Salvage {
         if (level < sv.minimumLevel) {
             Messenger.actionBar(player, Component.text("Requires Salvage level " + sv.minimumLevel + ".",
                     NamedTextColor.RED));
-            return ActionResult.PASS;
+            return;
         }
 
         // Integrity gate (per-item override or global)
@@ -71,7 +104,7 @@ public final class Salvage {
         if (integrity < minIntegrity) {
             int pct = Math.round((sv.minIntegrityPercent != null ? sv.minIntegrityPercent : cfg.minIntegrityPercent));
             Messenger.actionBar(player, Component.text("Item is too damaged to salvage (min " + pct + "% integrity).", NamedTextColor.RED));
-            return ActionResult.PASS;
+            return;
         }
 
         // Confirm flow
@@ -84,7 +117,7 @@ public final class Salvage {
             PENDING.put(player.getUuid(), new Pending(slot, stack.copy(), now + CONFIRM_TICKS));
             Messenger.actionBar(player, Component.text("Use again to salvage (destroys item).", NamedTextColor.YELLOW));
             SoundUtil.playSound(player, SoundEvents.BLOCK_SMITHING_TABLE_USE, 0.7f, 1.2f);
-            return ActionResult.CONSUME;
+            return;
         }
 
         // Do salvage
@@ -92,7 +125,7 @@ public final class Salvage {
         Item salvageMat = resolveSalvageMaterial(stack, sv, category);
         if (salvageMat == null) {
             Messenger.actionBar(player, Component.text("No salvage material configured for this item.", NamedTextColor.RED));
-            return ActionResult.PASS;
+            return;
         }
 
         int baseMaxQty = (sv.maximumQuantity != null) ? sv.maximumQuantity : fallbackMaxQuantity(stack.getItem());
@@ -115,8 +148,7 @@ public final class Salvage {
         // XP award proportional to yield
         float baseXp = cfg.xpModifiers.getOrDefault("Base", 1000.0f);
         float catMul = cfg.xpModifiers.getOrDefault(category, cfg.xpModifiers.getOrDefault("Other", 1.0f));
-        float frac = qty / (float) baseMaxQty;
-        long xp = Math.round(baseXp * catMul * sv.xpMultiplier * frac);
+        long xp = Math.round(baseXp * catMul * sv.xpMultiplier);
         Leveling.addXp(player, SkillType.SALVAGE, xp);
 
         // Consume the item being salvaged (destroy one from the stack)
@@ -130,10 +162,14 @@ public final class Salvage {
         SoundUtil.playSound(player, SoundEvents.BLOCK_ANVIL_DESTROY, 0.9f, extracted ? 1.25f : 1.0f);
 
         PENDING.remove(player.getUuid());
-        return ActionResult.CONSUME;
     }
 
     // ---------------- helpers ----------------
+    private static boolean isSalvageable(ItemStack stack) {
+        SalvageConfig cfg = ConfigManager.getSkillConfig(SkillType.SALVAGE);
+        Identifier id = Registries.ITEM.getId(stack.getItem());
+        return cfg.salvageables.containsKey(id.toString());
+    }
 
     private static boolean sameItem(ItemStack a, ItemStack b) {
         if (!a.isOf(b.getItem())) return false;

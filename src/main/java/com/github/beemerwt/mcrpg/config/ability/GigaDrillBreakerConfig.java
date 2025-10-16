@@ -8,6 +8,6 @@ import com.github.beemerwt.mcrpg.config.SuperAbilityConfig;
 @JanksonObject
 public class GigaDrillBreakerConfig extends SuperAbilityConfig {
     @JankComment("Digging speed multiplier, scaling with skill level")
-    public double baseSpeedMultipier = 1.5;
-    public double maxSpeedMultipier = 4.0;
+    public float baseSpeedMultipier = 1.5f;
+    public float maxSpeedMultipier = 4.0f;
 }

@@ -1,5 +1,6 @@
 package com.github.beemerwt.mcrpg.callback;
 
+import com.github.beemerwt.mcrpg.proxies.AbstractFurnaceBlockEntityProxy;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
 import net.minecraft.block.entity.AbstractFurnaceBlockEntity;
@@ -9,11 +10,11 @@ import net.minecraft.util.math.BlockPos;
 public class FurnaceEvents {
 
     public interface FuelConsumed {
-        void onFuelConsumed(BlockPos pos, AbstractFurnaceBlockEntity entity, ItemStack fuel);
+        void onFuelConsumed(AbstractFurnaceBlockEntityProxy proxy, ItemStack fuel);
     }
 
     public interface SmeltedItem {
-        void onSmeltedItem(BlockPos pos, AbstractFurnaceBlockEntity entity, ItemStack input, ItemStack output);
+        void onSmeltedItem(AbstractFurnaceBlockEntityProxy proxy, ItemStack input, ItemStack output);
     }
 
     /**
@@ -22,9 +23,9 @@ public class FurnaceEvents {
      */
     public static final Event<FurnaceEvents.FuelConsumed> FUEL_CONSUMED = EventFactory.createArrayBacked(
             FurnaceEvents.FuelConsumed.class,
-            (listeners) -> (pos, entity, fuel) -> {
+            (listeners) -> (proxy, fuel) -> {
                 for (FurnaceEvents.FuelConsumed event : listeners) {
-                    event.onFuelConsumed(pos, entity, fuel);
+                    event.onFuelConsumed(proxy, fuel);
                 }
             }
     );
@@ -35,9 +36,9 @@ public class FurnaceEvents {
      */
     public static final Event<FurnaceEvents.SmeltedItem> ITEM_SMELTED = EventFactory.createArrayBacked(
             FurnaceEvents.SmeltedItem.class,
-            (listeners) -> (pos, entity, input, output) -> {
+            (listeners) -> (proxy, input, output) -> {
                 for (FurnaceEvents.SmeltedItem event : listeners) {
-                    event.onSmeltedItem(pos, entity, input, output);
+                    event.onSmeltedItem(proxy, input, output);
                 }
             }
     );

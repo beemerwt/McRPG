@@ -6,7 +6,7 @@ import com.github.beemerwt.mcrpg.config.skills.WoodcuttingConfig;
 import com.github.beemerwt.mcrpg.persistent.PlacedBlockTracker;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.util.BlockClassifier;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;

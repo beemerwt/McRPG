@@ -2,7 +2,6 @@ package com.github.beemerwt.mcrpg.persistent;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.server.world.ServerWorld;
@@ -44,41 +43,60 @@ public class FurnaceSlotOwners extends PersistentState {
 
     private static final String KEY = "mcrpg_furnace_slot_owners";
 
-    private record Entry(long pos, String input, String fuel) {
-        static final Codec<Entry> CODEC = RecordCodecBuilder.create(inst -> inst.group(
-                Codec.LONG.fieldOf("pos").forGetter(Entry::pos),
-                Codec.STRING.optionalFieldOf("input").xmap(opt -> opt.orElse(null), Optional::ofNullable).forGetter(Entry::input),
-                Codec.STRING.optionalFieldOf("fuel").xmap(opt -> opt.orElse(null), Optional::ofNullable).forGetter(Entry::fuel)
-        ).apply(inst, Entry::new));
+    private static final class Entry {
+        private final BlockPos pos;
+        private final UUID inputOwner;
+        private final UUID fuelOwner;
+
+        public Entry(BlockPos pos, UUID inputOwner, UUID fuelOwner) {
+            this.pos = pos;
+            this.inputOwner = inputOwner;
+            this.fuelOwner = fuelOwner;
+        }
+
+        public Optional<String> getInputOwner() {
+            return Optional.ofNullable(inputOwner).map(UUID::toString);
+        }
+
+        public Optional<String> getFuelOwner() {
+            return Optional.ofNullable(fuelOwner).map(UUID::toString);
+        }
     }
 
-    private static final Codec<FurnaceSlotOwners> CODEC = RecordCodecBuilder.create(inst ->
-            inst.group(
-                    Entry.CODEC.listOf().fieldOf("entries").forGetter(m -> {
-                        List<Entry> out = new ArrayList<>(m.byPos.size());
-                        for (Long2ObjectMap.Entry<Owners> e : m.byPos.long2ObjectEntrySet()) {
-                            long pos = e.getLongKey();
-                            Owners o = e.getValue();
-                            out.add(new Entry(
-                                    pos,
-                                    o.input == null ? null : o.input.toString(),
-                                    o.fuel  == null ? null : o.fuel.toString()
-                            ));
-                        }
-                        return out;
-                    })
-            ).apply(inst, entries -> {
-                FurnaceSlotOwners m = new FurnaceSlotOwners();
-                for (Entry e : entries) {
-                    UUID in  = parseUuidOrNull(e.input());
-                    UUID fu  = parseUuidOrNull(e.fuel());
-                    Owners o = new Owners(in, fu);
-                    if (!o.isAllNull()) {
-                        m.byPos.put(e.pos(), o);
-                    }
+    private static final Codec<Entry> ENTRY_CODEC = RecordCodecBuilder.create(inst -> inst.group(
+            BlockPos.CODEC.fieldOf("pos").forGetter(e -> e.pos),
+
+            Codec.STRING.optionalFieldOf("input").xmap(
+                    FurnaceSlotOwners::toUuidOpt,
+                    FurnaceSlotOwners::toStringOpt
+            ).forGetter(e -> Optional.ofNullable(e.inputOwner)),
+
+            Codec.STRING.optionalFieldOf("fuel").xmap(
+                    FurnaceSlotOwners::toUuidOpt,
+                    FurnaceSlotOwners::toStringOpt
+            ).forGetter(e -> Optional.ofNullable(e.fuelOwner))
+        ).apply(inst, (blockPos, input, fuel) ->
+            new Entry(blockPos, input.orElse(null), fuel.orElse(null))
+        ));
+
+    private static final Codec<List<Entry>> ENTRIES_CODEC = ENTRY_CODEC.listOf();
+
+    private static final Codec<FurnaceSlotOwners> CODEC = ENTRIES_CODEC.xmap(
+            list -> {
+                FurnaceSlotOwners f = new FurnaceSlotOwners();
+                for (Entry e : list) f.put(e.pos, e.inputOwner, e.fuelOwner);
+                return f;
+            },
+            f -> {
+                List<Entry> out = new ArrayList<>(f.byPos.size());
+                for (var it = f.byPos.long2ObjectEntrySet().fastIterator(); it.hasNext();) {
+                    var kv = it.next();
+                    BlockPos pos = BlockPos.fromLong(kv.getLongKey());
+                    var owners = kv.getValue();
+                    out.add(new Entry(pos, owners.input, owners.fuel));
                 }
-                return m;
-            })
+                return out;
+            }
     );
 
     private final Long2ObjectOpenHashMap<Owners> byPos = new Long2ObjectOpenHashMap<>();
@@ -154,13 +172,23 @@ public class FurnaceSlotOwners extends PersistentState {
         return byPos.isEmpty();
     }
 
+    private void put(BlockPos pos, UUID input, UUID fuel) {
+        byPos.put(pos.asLong(), new Owners(input, fuel));
+    }
+
     // Helpers
-    private static UUID parseUuidOrNull(String s) {
-        if (s == null || s.isEmpty()) return null;
+    private static Optional<UUID> toUuidOpt(Optional<String> s) {
+        if (s.isEmpty()) return Optional.empty();
+        var str = s.get();
+        if (str.isEmpty()) return Optional.empty();
         try {
-            return UUID.fromString(s);
+            return Optional.of(UUID.fromString(str));
         } catch (IllegalArgumentException ex) {
-            return null;
+            return Optional.empty();
         }
+    }
+
+    private static Optional<String> toStringOpt(Optional<UUID> u) {
+        return u.map(UUID::toString);
     }
 }

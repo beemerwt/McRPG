@@ -4,16 +4,14 @@ import com.github.beemerwt.mcrpg.command.AdminCommand;
 import com.github.beemerwt.mcrpg.command.SkillCommand;
 import com.github.beemerwt.mcrpg.events.*;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
-import com.github.beemerwt.mcrpg.data.BinaryPlayerStore;
 import com.github.beemerwt.mcrpg.data.PlayerStore;
 import com.github.beemerwt.mcrpg.managers.AbilityManager;
-import com.github.beemerwt.mcrpg.skills.Acrobatics;
-import com.github.beemerwt.mcrpg.skills.Smelting;
-import com.github.beemerwt.mcrpg.skills.Swords;
+import com.github.beemerwt.mcrpg.skills.*;
 import com.github.beemerwt.mcrpg.ui.HealthbarHover;
 import com.github.beemerwt.mcrpg.ui.XpBossbarManager;
 import com.github.beemerwt.mcrpg.util.FabricLogger;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -41,29 +39,29 @@ public class McRPG implements ModInitializer {
         ConfigManager.init();            // loads defaults + overrides
         AbilityManager.init();
 
-        store = new BinaryPlayerStore();
+        store = PlayerStore.create();
         BlockEvents.register();
         AbilityEvents.register();
         CombatEvents.register();
 
-        SkillCommand.register(store);
-        AdminCommand.register(store);
+        CommandRegistrationCallback.EVENT.register((d, access, regEnv) -> {
+                SkillCommand.register(d);
+                AdminCommand.register(d);
+        });
 
-        XpBossbarManager.init(); // <--- add this line
+        XpBossbarManager.init();
         HealthbarHover.init();
 
         Acrobatics.register();
+        Herbalism.register();
+        Repair.register();
+        Salvage.register();
         Smelting.register();
         Swords.register();
 
         ServerPlayerEvents.JOIN.register(player -> {
-            // On player join:
-            var pd = store.get(player); // ensures cached PD
-            String cur = player.getGameProfile().name();
-            if (cur != null && !cur.equals(pd.name)) {
-                // update cached PD and nameIndex (as shown in the previous message)
-                store.save(player.getUuid()); // optional: persist immediately
-            }
+            store.ensurePlayerRow(player.getUuid(), player.getStringifiedName());
+            store.get(player); // touch the player to load or create their data
         });
 
         lastSave = System.currentTimeMillis();

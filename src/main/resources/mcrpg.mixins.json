@@ -4,11 +4,12 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "BlockOnPlacedMixin",
-    "CropBlockTickMixin",
+    "CropBlockMixin",
     "ScreenHandlerMixin",
     "AbstractFurnaceScreenHandlerMixin",
     "AbstractFurnaceBlockEntityMixin",
     "PlayerInventoryMixin",
+    "ServerPlayerInteractionManagerMixin",
     "access.DamageTrackerAccessor",
     "access.CropBlockInvoker"
   ],

@@ -6,7 +6,7 @@ import com.github.beemerwt.mcrpg.config.GeneralConfig;
 import com.github.beemerwt.mcrpg.mixin.access.DamageTrackerAccessor;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.entity.Entity;
@@ -83,8 +83,6 @@ public final class CombatEvents {
             var skill = classifyFromContext(sp, src);
             if (skill != null) {
                 var cfg  = ConfigManager.getSkillConfig(skill);
-                if (cfg == null) return;
-
                 long base = baseKillXp(victim, cfg.xpModifier);
                 long xp   = Math.round(applied * base);
                 if (xp < 1) xp = 1;

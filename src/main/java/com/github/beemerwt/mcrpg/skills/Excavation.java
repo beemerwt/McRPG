@@ -6,9 +6,10 @@ import com.github.beemerwt.mcrpg.config.skills.ExcavationConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.abilities.TreasureFinding;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import net.minecraft.block.BlockState;
 import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -25,15 +26,14 @@ public class Excavation {
                                   List<ItemStack> drops)
     {
         ExcavationConfig cfg = ConfigManager.getSkillConfig(SkillType.EXCAVATION);
-        var data = McRPG.getStore().get(player);
         var blocks = cfg.getBlocks();
         var block = state.getBlock();
 
         long blockXp = Leveling.resolveBlockXp(blocks, block);
         if (blockXp <= 0) return;
 
-        long currentXp = data.xp.get(SkillType.EXCAVATION);
-        int level = Leveling.levelFromTotalXp(currentXp);
+        int level = Leveling.getLevel(player, SkillType.EXCAVATION);
+        var id = Registries.BLOCK.getId(block).toString();
 
         // Only trigger skills if the player is using a pickaxe
         var tool = player.getMainHandStack().getItem();

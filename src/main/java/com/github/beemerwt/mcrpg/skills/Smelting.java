@@ -3,14 +3,14 @@ package com.github.beemerwt.mcrpg.skills;
 import com.github.beemerwt.mcrpg.McRPG;
 import com.github.beemerwt.mcrpg.callback.FurnaceEvents;
 import com.github.beemerwt.mcrpg.callback.ScreenHandlerEvents;
-import com.github.beemerwt.mcrpg.extension.FuelTimeExtension;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.SmeltingConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.persistent.FurnaceSlotOwners;
+import com.github.beemerwt.mcrpg.proxies.AbstractFurnaceBlockEntityProxy;
 import com.github.beemerwt.mcrpg.text.Component;
 import com.github.beemerwt.mcrpg.text.NamedTextColor;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import com.github.beemerwt.mcrpg.util.Messenger;
 import net.minecraft.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.item.FuelRegistry;
@@ -44,8 +44,9 @@ public final class Smelting {
         FurnaceEvents.FUEL_CONSUMED.register(Smelting::onFuelConsumed);
     }
 
-    private static void onFuelConsumed(BlockPos pos, AbstractFurnaceBlockEntity entity, ItemStack fuel) {
-        if (!(entity.getWorld() instanceof ServerWorld sw)) return;
+    private static void onFuelConsumed(AbstractFurnaceBlockEntityProxy proxy, ItemStack fuel) {
+        if (!(proxy.world() instanceof ServerWorld sw)) return;
+        var pos = proxy.pos();
         var ownerId = FurnaceSlotOwners.get(sw).getFuelOwner(pos);
         if (ownerId == null) {
             McRPG.getLogger().debug("Couldn't find owner for furnace at {}", pos);
@@ -65,29 +66,31 @@ public final class Smelting {
         }
 
         SmeltingConfig cfg = ConfigManager.getSkillConfig(SkillType.SMELTING);
-        int smeltingLevel = Leveling.getLevel(ownerId, SkillType.SMELTING);
+        var data = McRPG.getStore().get(ownerId);
+        int smeltingLevel = Leveling.getLevel(data, SkillType.SMELTING);
         float fuelMult = Leveling.getScaled(cfg.baseFuelEfficiencyMultiplier,
                 cfg.maxFuelEfficiencyMultiplier, smeltingLevel);
 
-        FuelTimeExtension ext = (FuelTimeExtension) entity;
         addedTicks = (int) Math.floor(addedTicks * (fuelMult - 1.0f));
-        ext.addFuelTime(addedTicks);
+        proxy.addFuelTime(addedTicks);
 
         McRPG.getLogger().debug("Added {} ticks to furnace at {} for player {}", addedTicks, pos, ownerId);
     }
 
-    private static void onItemSmelted(BlockPos blockPos, AbstractFurnaceBlockEntity entity,
+    private static void onItemSmelted(AbstractFurnaceBlockEntityProxy proxy,
                                       ItemStack input, ItemStack output) {
-        if (!(entity.getWorld() instanceof ServerWorld sw)) return;
-        var ownerId = FurnaceSlotOwners.get(sw).getInputOwner(blockPos);
+        if (!(proxy.world() instanceof ServerWorld sw)) return;
+        var pos = proxy.pos();
+        var ownerId = FurnaceSlotOwners.get(sw).getInputOwner(pos);
         if (ownerId == null) {
-            McRPG.getLogger().debug("Couldn't find owner for furnace at {}", blockPos);
+            McRPG.getLogger().debug("Couldn't find owner for furnace at {}", pos);
             return;
         }
 
         SmeltingConfig cfg = ConfigManager.getSkillConfig(SkillType.SMELTING);
 
-        int smeltingLevel = Leveling.getLevel(ownerId, SkillType.SMELTING);
+        var data = McRPG.getStore().get(ownerId);
+        int smeltingLevel = Leveling.getLevel(data, SkillType.SMELTING);
         float xpMult = Leveling.getScaled(cfg.baseXpMultiplier, cfg.maxXpMultiplier, smeltingLevel);
 
         String key = idOf(input);
@@ -98,19 +101,18 @@ public final class Smelting {
         }
 
         long award = Math.round(baseXp * xpMult);
-        if (trySecondSmelt(entity, ownerId, output))
+        if (trySecondSmelt(ownerId, output))
             award *= 2;
 
-        Leveling.addXp(ownerId, SkillType.SMELTING, award);
+        Leveling.addXp(data, SkillType.SMELTING, award);
     }
 
     // Called by furnace mixin to decide whether to double the result and (optionally) message
-    public static boolean trySecondSmelt(AbstractFurnaceBlockEntity furnace,
-                                         UUID ownerId,
-                                         ItemStack output) {
+    public static boolean trySecondSmelt(UUID ownerId, ItemStack output) {
         SmeltingConfig cfg = ConfigManager.getSkillConfig(SkillType.SMELTING);
 
-        int smeltingLevel = Leveling.getLevel(ownerId, SkillType.SMELTING);
+        var data = McRPG.getStore().get(ownerId);
+        int smeltingLevel = Leveling.getLevel(data, SkillType.SMELTING);
         float chance = Leveling.getScaledPercentage(cfg.doubleDrops.baseChance,
                 cfg.doubleDrops.maxChance, smeltingLevel);
 

@@ -1,5 +1,9 @@
 package com.github.beemerwt.mcrpg.data;
 
+import com.github.beemerwt.mcrpg.util.TextUtil;
+
+import java.util.Optional;
+
 public enum SkillType {
     // General skills
     MINING((short) 0),
@@ -32,5 +36,14 @@ public enum SkillType {
         throw new IllegalArgumentException("No SkillType with id " + id);
     }
 
+    public static Optional<SkillType> parseSkill(String name) {
+        try {
+            return Optional.of(SkillType.valueOf(name.trim().toUpperCase()));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
     public short id() { return id; }
+    public String getName() { return TextUtil.toTitleCase(this.name()); }
 }

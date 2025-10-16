@@ -6,7 +6,7 @@ import com.github.beemerwt.mcrpg.config.skills.SwordsConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import net.minecraft.entity.EquipmentSlot;
@@ -29,13 +29,13 @@ public class Swords {
     );
 
     public static void register() {
-        PlayerEvents.EQUIP_ITEM.register(Swords::onEquipItem);
+        PlayerEvents.CHANGE_SLOT.register(Swords::onChangeSlot);
     }
 
-    private static void onEquipItem(
+    private static void onChangeSlot(
             ServerPlayerEntity player, EquipmentSlot slot, ItemStack oldStack, ItemStack newStack
     ) {
-        McRPG.getLogger().debug("onEquipItem: player={}, slot={}, oldStack={}, newStack={}",
+        McRPG.getLogger().debug("onChangeSlot: player={}, slot={}, oldStack={}, newStack={}",
                 player.getStringifiedName(), slot, oldStack, newStack);
 
         if (slot == EquipmentSlot.MAINHAND && ItemClassifier.isSword(newStack.getItem()))

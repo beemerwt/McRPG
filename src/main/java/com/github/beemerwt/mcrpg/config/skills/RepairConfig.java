@@ -25,6 +25,7 @@ public class RepairConfig extends SkillConfig {
     @JankComment("""
         The percentage chance (0-100) to perform a super repair, scaling with level.
         Doubles the amount of durability restored after the base bonus percentage.
+        Does not override max durability if specified.
         """)
     public float baseSuperRepairChance = 0.0f;
     public float maxSuperRepairChance = 20.0f;
@@ -50,10 +51,10 @@ public class RepairConfig extends SkillConfig {
     @JanksonObject
     public static class Repairable {
         @JankOptional
-        public String repairMaterial = "";
+        public String repairMaterial = null;
 
         @JankOptional
-        public Integer maximumDurability = -1;
+        public Integer maximumDurability = null;
 
         public int minimumLevel = 0;
 
@@ -71,7 +72,7 @@ public class RepairConfig extends SkillConfig {
     - minimumQuantity: The minimum quantity of the repair material required to perform a repair. If null, defaults to 1.
     - xpMultiplier: Multiplier for XP gained from repairing this item.
     """)
-    public Map<String, Repairable> repairables = Map.ofEntries(
+    public Map<String, Repairable> repairables = Map.<String, Repairable>ofEntries(
             // Shield (wood-based)
             Map.entry("minecraft:shield", r("minecraft:oak_planks", 336, 6, 0, 0.25f)),
 

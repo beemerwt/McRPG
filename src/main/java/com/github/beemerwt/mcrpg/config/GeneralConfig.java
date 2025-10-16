@@ -31,6 +31,16 @@ public class GeneralConfig extends Config {
     public boolean debug = false;
     public int autoSaveEverySeconds = 300; // 5 minutes
 
+    @JankComment("""
+        Permissions System for McRPG.
+        Options:
+        - None: Permissions are handled internally by McRPG.
+        - Fabric: Uses Fabric's permission API.
+        - LuckPerms: Uses LuckPerms mod for permissions.
+        """
+    )
+    public String permissions = "None";
+
     @JankComment("Max level a skill can reach")
     public int maxLevel = 1000;
 

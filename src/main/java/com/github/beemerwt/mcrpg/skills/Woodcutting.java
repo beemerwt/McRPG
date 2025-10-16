@@ -11,7 +11,7 @@ import com.github.beemerwt.mcrpg.abilities.LeafBlower;
 import com.github.beemerwt.mcrpg.abilities.TreeFeller;
 import com.github.beemerwt.mcrpg.util.BlockClassifier;
 import com.github.beemerwt.mcrpg.util.ItemClassifier;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import net.minecraft.block.BlockState;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -41,8 +41,7 @@ public class Woodcutting {
         long blockXp = Leveling.resolveBlockXp(cfg.getBlocks(), block);
         if (blockXp <= 0) return;
 
-        var data = McRPG.getStore().get(player);
-        int level = Leveling.levelFromTotalXp(data.xp.get(SkillType.WOODCUTTING));
+        int level = Leveling.getLevel(player, SkillType.WOODCUTTING);
 
         // Only trigger abilities when using an axe
         if (ItemClassifier.isAxe(player.getMainHandStack().getItem())) {

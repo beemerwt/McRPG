@@ -1,5 +1,6 @@
 package com.github.beemerwt.mcrpg.abilities;
 
+import com.github.beemerwt.mcrpg.McRPG;
 import com.github.beemerwt.mcrpg.config.skills.ExcavationConfig;
 import net.minecraft.block.Block;
 import net.minecraft.entity.ItemEntity;
@@ -9,6 +10,7 @@ import net.minecraft.registry.Registries;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.World;
 
 import java.util.Map;
@@ -42,11 +44,7 @@ public class TreasureFinding {
         Map.Entry<String, ExcavationConfig.TreasureEntry> weightedPick = null;
         double sumLambda = 0.0;
 
-        // NOTE: For best performance, make TreasureEntry.dropsFrom a Set of something cheap
-        // (e.g., raw int ids) and compare against that directly. If it's a Set<String>, at
-        // least avoid block.toString() and provide the exact canonical key once per call.
-        // Replace this with your own canonical block id lookup if available.
-        final String blockKey = block.toString(); // TODO: replace with registry id string/Identifier for speed
+        final String blockKey = Registries.BLOCK.getId(block).toString();
 
         for (Map.Entry<String, ExcavationConfig.TreasureEntry> me : treasures.entrySet()) {
             final ExcavationConfig.TreasureEntry e = me.getValue();

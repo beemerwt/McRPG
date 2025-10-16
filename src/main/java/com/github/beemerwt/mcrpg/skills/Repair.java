@@ -1,15 +1,14 @@
 package com.github.beemerwt.mcrpg.skills;
 
 import com.github.beemerwt.mcrpg.McRPG;
+import com.github.beemerwt.mcrpg.callback.PlayerEvents;
 import com.github.beemerwt.mcrpg.config.skills.RepairConfig;
-import com.github.beemerwt.mcrpg.data.PlayerData;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.text.Component;
 import com.github.beemerwt.mcrpg.text.NamedTextColor;
-import com.github.beemerwt.mcrpg.util.Leveling;
-import com.github.beemerwt.mcrpg.util.Messenger;
-import com.github.beemerwt.mcrpg.util.SoundUtil;
+import com.github.beemerwt.mcrpg.util.*;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
@@ -17,7 +16,10 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.hit.BlockHitResult;
+import org.joml.Math;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -29,19 +31,54 @@ public final class Repair {
 
     private static final int CONFIRM_TICKS = 100; // ~5s
     private static final ConcurrentHashMap<UUID, Pending> PENDING = new ConcurrentHashMap<>();
+    private static final ThreadLocal<Boolean> IS_REPAIRING = ThreadLocal.withInitial(() -> false);
 
     private record Pending(int slot, ItemStack snapshot, long expiresAtTick) {}
 
-    /**
-     * Called iff a player right-clicks an iron block.
-     */
-    public static ActionResult onPlayerUse(ServerPlayerEntity player, ServerWorld world) {
-        ItemStack stack = player.getMainHandStack();
-        if (stack.isEmpty() || !stack.isDamageable() || stack.getMaxDamage() <= 0) {
-            Messenger.actionBar(player, Component.text("Hold a damaged item to repair.", NamedTextColor.GRAY));
+    public static void register() {
+        PlayerEvents.INTERACT_ITEM.register(Repair::onItemInteract);
+    }
+
+    private static ActionResult onItemInteract(ServerPlayerEntity player, ItemStack itemStack, Hand hand) {
+        if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
+        if (!isRepairable(itemStack)) return ActionResult.PASS;
+
+        // Check player is looking at an iron block within reach
+        var range = player.getBlockInteractionRange();
+        var raycastResult = player.raycast(range, 0.0f, false);
+        if (!(raycastResult instanceof BlockHitResult blockHitResult)) {
+            McRPG.getLogger().debug("Repair: onItemInteract: player={}, item={}: no block in sight",
+                    player.getName().getString(),
+                    itemStack
+            );
             return ActionResult.PASS;
         }
 
+        var world = player.getEntityWorld();
+        var blockPos = blockHitResult.getBlockPos();
+        var blockState = world.getBlockState(blockPos);
+        if (blockState == null || !BlockClassifier.isIronBlock(blockState.getBlock())) {
+            McRPG.getLogger().debug("Repair: onItemInteract: player={}, item={}: not looking at iron block",
+                    player.getName().getString(),
+                    itemStack
+            );
+            return ActionResult.PASS;
+        }
+
+        tryRepairItem(player, world, itemStack);
+        return ActionResult.CONSUME;
+    }
+
+    // ---------- helpers ----------
+    private static boolean isRepairable(ItemStack stack) {
+        if (!stack.isDamageable()) return false;
+        if (stack.getDamage() <= 0) return false;
+        RepairConfig cfg = ConfigManager.getSkillConfig(SkillType.REPAIR);
+        Identifier id = Registries.ITEM.getId(stack.getItem());
+        return cfg.repairables.containsKey(id.toString());
+    }
+
+    private static void tryRepairItem(ServerPlayerEntity player, ServerWorld world, ItemStack stack) {
         final Identifier itemId = Registries.ITEM.getId(stack.getItem());
         final String itemKey = itemId.toString();
 
@@ -50,29 +87,24 @@ public final class Repair {
 
         // Fallback: generate a sane default if not configured.
         if (rp == null) {
-            Messenger.actionBar(player, Component.text("This item cannot be repaired here.", NamedTextColor.RED));
-            return ActionResult.PASS;
+            Messenger.actionBar(player, Component.text("This item cannot be repaired here.",
+                    NamedTextColor.RED));
+            return;
         }
 
         // Level gate
-        int level = currentLevel(player);
+        int level = Leveling.getLevel(player, SkillType.REPAIR);
         if (level < rp.minimumLevel) {
             Messenger.actionBar(player, Component.text("Requires Repair level " + rp.minimumLevel
                     + " to repair.", NamedTextColor.RED));
-            return ActionResult.PASS;
+            return;
         }
 
-        // Optional maximumDurability gate (cap by item type's max damage)
-        if (rp.maximumDurability != null && rp.maximumDurability > 0 && stack.getMaxDamage() > rp.maximumDurability) {
-            Messenger.actionBar(player, Component.text("That item cannot be repaired here.", NamedTextColor.RED));
-            return ActionResult.PASS;
-        }
-
-        final int damage = stack.getDamage(); // 0 = undamaged
+        final int damage = stack.getDamage();
         final int maxDamage = stack.getMaxDamage();
         if (damage <= 0) {
             Messenger.actionBar(player, Component.text("That item is already fully repaired.", NamedTextColor.GRAY));
-            return ActionResult.PASS;
+            return;
         }
 
         final int slot = player.getInventory().getSelectedSlot();
@@ -84,7 +116,7 @@ public final class Repair {
             PENDING.put(player.getUuid(), new Pending(slot, stack.copy(), now + CONFIRM_TICKS));
             Messenger.actionBar(player, Component.text("Use again to confirm repair", NamedTextColor.YELLOW));
             SoundUtil.playSound(player, SoundEvents.BLOCK_ANVIL_STEP, 0.6f, 1.1f);
-            return ActionResult.CONSUME;
+            return;
         }
 
         // Resolve the repair material (explicit or inferred by category)
@@ -92,20 +124,21 @@ public final class Repair {
         Item repairItem = resolveRepairItem(rp, category);
         if (repairItem == null) {
             Messenger.actionBar(player, Component.text("No repair material configured for this item.", NamedTextColor.RED));
-            return ActionResult.PASS;
+            return;
         }
 
         // Quantity requirement
         int minQty = (rp.minimumQuantity != null && rp.minimumQuantity > 0) ? rp.minimumQuantity : 1;
 
-        int available = countInInventory(player, repairItem);
+        int available = InventoryUtil.countInInventory(player, repairItem);
         if (available < minQty) {
-            Messenger.actionBar(player, Component.text("Need " + minQty + "x " + displayName(repairItem) + " to repair.", NamedTextColor.RED));
-            return ActionResult.PASS;
+            Messenger.actionBar(player, Component.text("Need " + minQty + "x " +
+                    displayName(repairItem) + " to repair.", NamedTextColor.RED));
+            return;
         }
 
         // Compute base restore percent (uniform between base..max)
-        float pctBase = lerp(cfg.baseDurabilityPercent, cfg.maxDurabilityPercent, world.getRandom().nextFloat());
+        float pctBase = Math.lerp(cfg.baseDurabilityPercent, cfg.maxDurabilityPercent, world.getRandom().nextFloat());
 
         // Level-scaled bonuses (expected to already be 0..1 fractions)
         float bonusPct = Leveling.getScaledPercentage(cfg.baseBonusPercentage, cfg.maxBonusPercentage, level);
@@ -117,23 +150,26 @@ public final class Repair {
         boolean superRepair = world.getRandom().nextDouble() < superChance;
         if (superRepair) restore *= 2.0f;
 
+        if (rp.maximumDurability != null && rp.maximumDurability > 0) {
+            restore = Math.min(restore, rp.maximumDurability);
+        }
+
         int applied = Math.min(damage, Math.round(restore));
         if (applied <= 0) {
             Messenger.actionBar(player, Component.text("Could not repair that item.", NamedTextColor.RED));
-            return ActionResult.PASS;
+            return;
         }
 
         // Consume materials
-        removeFromInventory(player, repairItem, minQty);
+        InventoryUtil.removeFromInventory(player, repairItem, minQty);
 
         // Apply repair (reduce damage)
         stack.setDamage(Math.max(0, damage - applied));
 
-        // XP: Base × category × per-item × fraction restored
+        // XP: Base × category × per-item multiplier
         float baseXp = cfg.xpModifiers.getOrDefault("Base", 1000.0f);
         float catMul = cfg.xpModifiers.getOrDefault(category, cfg.xpModifiers.getOrDefault("Other", 1.5f));
-        float frac = applied / (float) maxDamage;
-        long xp = Math.round(baseXp * catMul * rp.xpMultiplier * frac);
+        long xp = Math.round(baseXp * catMul * rp.xpMultiplier);
         Leveling.addXp(player, SkillType.REPAIR, xp);
 
         // Feedback
@@ -143,16 +179,6 @@ public final class Repair {
 
         // Clear pending
         PENDING.remove(player.getUuid());
-        return ActionResult.CONSUME;
-    }
-
-    // ---------- helpers ----------
-
-    private static int currentLevel(ServerPlayerEntity player) {
-        PlayerData data = McRPG.getStore().get(player);
-        long total = data.xp.get(SkillType.REPAIR);
-        return Leveling.levelFromTotalXp(total);
-        // Or Leveling.getLevel(player, SkillType.REPAIR) if you have it.
     }
 
     private static boolean isSameItemForConfirm(ItemStack now, Pending pending) {
@@ -165,10 +191,6 @@ public final class Repair {
 
     private static String displayName(Item item) {
         return Registries.ITEM.getId(item).toString();
-    }
-
-    private static float lerp(float a, float b, float t) {
-        return a + (b - a) * t;
     }
 
     private static String inferCategory(Identifier itemId) {
@@ -203,24 +225,5 @@ public final class Repair {
         };
         if (idStr.isEmpty()) return null;
         return Registries.ITEM.get(Identifier.tryParse(idStr));
-    }
-
-    private static int countInInventory(ServerPlayerEntity player, Item item) {
-        int total = 0;
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            ItemStack s = player.getInventory().getStack(i);
-            if (!s.isEmpty() && s.getItem() == item) total += s.getCount();
-        }
-        return total;
-    }
-
-    private static void removeFromInventory(ServerPlayerEntity player, Item item, int toRemove) {
-        for (int i = 0; i < player.getInventory().size() && toRemove > 0; i++) {
-            ItemStack s = player.getInventory().getStack(i);
-            if (s.isEmpty() || s.getItem() != item) continue;
-            int take = Math.min(s.getCount(), toRemove);
-            s.decrement(take);
-            toRemove -= take;
-        }
     }
 }

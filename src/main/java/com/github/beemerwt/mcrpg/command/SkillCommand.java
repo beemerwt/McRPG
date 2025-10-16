@@ -1,118 +1,81 @@
 package com.github.beemerwt.mcrpg.command;
 
-import com.github.beemerwt.mcrpg.util.Leveling;
-import com.github.beemerwt.mcrpg.data.PlayerStore;
-import com.github.beemerwt.mcrpg.permission.Permissions;
+import com.github.beemerwt.mcrpg.McRPG;
+import com.github.beemerwt.mcrpg.command.suggest.PlayerSuggester;
+import com.github.beemerwt.mcrpg.data.Leveling;
+import com.github.beemerwt.mcrpg.data.PlayerData;
+import com.github.beemerwt.mcrpg.data.SkillLinks;
 import com.github.beemerwt.mcrpg.data.SkillType;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.UUID;
-
+import static com.github.beemerwt.mcrpg.util.CommandUtils.fail;
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
-import static net.minecraft.command.argument.EntityArgumentType.getPlayer;
-import static net.minecraft.command.argument.EntityArgumentType.player;
 
 public final class SkillCommand {
     private SkillCommand() {}
 
-    /**
-     * Registers the "/skills" command.
-     * Usage:
-     *   /skills                  -> view your skills
-     *   /skills <player>         -> view another player's skills (perm: mcrpg.command.skills.others, OP 2)
-     */
-    public static void register(PlayerStore store) {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) -> {
-            dispatcher.register(literal("skills")
-                    .requires(Permissions.require("mcrpg.command.skills", 0)) // anyone by default
-                    .executes(ctx -> {
-                        ServerPlayerEntity self = ctx.getSource().getPlayer();
-                        if (self == null) return 0;
-                        showSkills(ctx.getSource(), store, self.getUuid(), self.getGameProfile().name());
-                        return 1;
-                    })
-                    .then(argument("player", player())
-                            .requires(Permissions.require("mcrpg.command.skills.others", 2)) // OP2 if no perms mod
-                            .executes(ctx -> {
-                                ServerPlayerEntity target = getPlayer(ctx, "player");
-                                showSkills(ctx.getSource(), store, target.getUuid(), target.getGameProfile().name());
-                                return 1;
-                            })
-                    )
-            );
-        });
+    public static void register(CommandDispatcher<ServerCommandSource> d) {
+        d.register(literal("skills")
+            .executes(SkillCommand::execSelf)
+            .then(argument("player", StringArgumentType.word()).suggests(PlayerSuggester.DATABASE)
+                .executes(SkillCommand::execOther))
+        );
     }
 
-    // ------------------------- Implementation -------------------------
+    private static int execSelf(CommandContext<ServerCommandSource> ctx) {
+        try {
+            var self = ctx.getSource().getPlayer();
+            if (self == null) return fail(ctx, "Cannot be run from console.");
 
-    private static void showSkills(ServerCommandSource src, PlayerStore store, UUID uuid, String name) {
-        var data = store.get(uuid);
+            var data = McRPG.getStore().get(self);
+            renderSkills(ctx, data);
+            return Command.SINGLE_SUCCESS;
+        } catch (Exception e) {
+            return fail(ctx, "Internal error: " + e.getMessage());
+        }
+    }
 
+    private static int execOther(CommandContext<ServerCommandSource> ctx) {
+        try {
+            String name = StringArgumentType.getString(ctx, "player");
+
+            var player = McRPG.getStore().lookup(name);
+            if (player.isEmpty()) return fail(ctx, "Player not found: " + name);
+
+            renderSkills(ctx, player.get());
+            return Command.SINGLE_SUCCESS;
+        } catch (Exception e) {
+            return fail(ctx, "Internal error: " + e.getMessage());
+        }
+    }
+
+    // -------------- presentation --------------
+
+    private static void renderSkills(CommandContext<ServerCommandSource> ctx, PlayerData pd) {
         // Header
-        src.sendFeedback(() -> Text.literal("McRPG Skills for " + name)
-                .formatted(Formatting.GOLD, Formatting.BOLD), false);
+        ctx.getSource().sendFeedback(() ->
+            Text.literal("Skills for " + pd.getName()).formatted(Formatting.GOLD), false);
 
-        // Column header
-        src.sendFeedback(() -> Text.literal(String.format("%-12s %-6s %-14s %-10s",
-                        "Skill", "Level", "XP in Level", "To Next"))
-                .formatted(Formatting.GRAY), false);
+        // One line per skill: Level (Total XP)
+        for (SkillType s : SkillType.values()) {
+            int level = Leveling.getLevel(pd, s);
+            var text = Text.literal(" - " + s.name() + ": ")
+                .append(Text.literal("Lv " + level).formatted(Formatting.GREEN));
 
-        // Separator
-        src.sendFeedback(() -> Text.literal("--------------------------------------------------")
-                .formatted(Formatting.DARK_GRAY), false);
+            if (!SkillLinks.isComposite(s)) {
+                long total = Leveling.getRawTotalXp(pd, s);
+                text = text.append(Text.literal("  (" + total + " XP)").formatted(Formatting.GRAY));
+            }
 
-        // Sort skills alphabetically for readability
-        Arrays.stream(SkillType.values())
-                .sorted(Comparator.comparing(Enum::name))
-                .forEach(skill -> {
-                    Progress p = progress(uuid, skill);
-
-                    // Line per skill
-                    MutableText line = Text.literal(String.format("%-12s ", title(skill)))
-                            .formatted(Formatting.YELLOW)
-                            .append(Text.literal(String.format("%-6d ", p.level)).formatted(Formatting.AQUA))
-                            .append(Text.literal(String.format("%-14s ", p.inLevel + "/" + p.needForNext)).formatted(Formatting.WHITE))
-                            .append(Text.literal(String.format("%-10d", p.needForNext - p.inLevel)).formatted(Formatting.GREEN));
-
-                    src.sendFeedback(() -> line, false);
-                });
+            final var line = text;
+            ctx.getSource().sendFeedback(() -> line, false);
+        }
     }
-
-    private static String title(SkillType s) {
-        // Pretty names
-        String n = s.name().toLowerCase();
-        return Character.toUpperCase(n.charAt(0)) + n.substring(1);
-    }
-
-    /**
-     * Compute level and in-level progress from a total XP using the global curve.
-     */
-    private static Progress progress(UUID player, SkillType skill) {
-        int lvl = Leveling.getLevel(player, skill);
-        long totalXp = Leveling.getTotalXp(player, skill);
-        long needThis = Leveling.xpForLevel(lvl + 1);
-
-        long spentBefore = sumNeededUpTo(lvl);
-        long inLevel = Math.max(0, totalXp - spentBefore);
-        // guard against odd curves
-        if (inLevel > needThis) inLevel = needThis;
-        return new Progress(lvl, inLevel, needThis);
-    }
-
-    private static long sumNeededUpTo(int level) {
-        long sum = 0;
-        for (int i = 1; i <= level; i++)
-            sum += Leveling.xpForLevel(i);
-        return sum;
-    }
-
-    private record Progress(int level, long inLevel, long needForNext) {}
 }

@@ -25,6 +25,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+// TODO: Validate all identifiers in configs
+//       Potentially use a special type like "BlockString" or "IDString" that does validation on set
+
 public final class ConfigManager {
     public static final Path CONFIG_DIR = FabricLoader.getInstance().getConfigDir().resolve("McRPG");
     public static final Path SKILLS_DIR = CONFIG_DIR.resolve("skills");

@@ -40,8 +40,8 @@ public class SwordsConfig extends SkillConfig {
         public boolean enabled = true;
 
         @JankComment("Damage bonus applied when hitting an enemy with a sword, scaling with skill level")
-        public double baseDamageBonus = 0.0;
-        public double maxDamageBonus = 8.0;
+        public float baseDamageBonus = 0.0f;
+        public float maxDamageBonus = 8.0f;
     }
 
     @JankKey("Serrated Strikes")

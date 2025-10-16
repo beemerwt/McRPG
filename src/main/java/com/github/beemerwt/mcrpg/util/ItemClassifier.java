@@ -58,11 +58,11 @@ public final class ItemClassifier {
     }
 
     public static boolean isTrident(Item item) {
-        return Registries.ITEM.getId(item).toString().equalsIgnoreCase("minecraft:trident");
+        return Registries.ITEM.getId(item).equals(TRIDENT_ITEM);
     }
 
     public static boolean isMace(Item item) {
-        return Registries.ITEM.getId(item).toString().equalsIgnoreCase("minecraft:mace");
+        return Registries.ITEM.getId(item).equals(MACE_ITEM);
     }
 
     public static String getItemType(Item item) {

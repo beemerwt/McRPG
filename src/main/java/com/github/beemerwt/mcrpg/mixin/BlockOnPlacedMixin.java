@@ -10,7 +10,7 @@ import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.text.Component;
 import com.github.beemerwt.mcrpg.text.NamedTextColor;
 import com.github.beemerwt.mcrpg.util.BlockClassifier;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import com.github.beemerwt.mcrpg.util.Messenger;
 import com.github.beemerwt.mcrpg.util.SoundUtil;
 import net.minecraft.block.Block;
@@ -70,14 +70,10 @@ public abstract class BlockOnPlacedMixin {
         }
 
         if (cfg instanceof HerbalismConfig herbCfg) {
-            var data = McRPG.getStore().get(sp);
-            if (data == null) {
-                McRPG.getLogger().warning("Could not find McRPG data for player {} when placing block {}",
-                        placer.getName().getString(), id);
-                return;
-            }
+            // TODO: Mark crops that don't have an age with -1 modifier
+            //       So we can ignore them when awarding xp
 
-            int level = Leveling.levelFromTotalXp(data.xp.get(SkillType.HERBALISM));
+            int level = Leveling.getLevel(sp, SkillType.HERBALISM); // ensure level is cached
             float growthModifier = Leveling.getScaled(herbCfg.greenThumb.baseGrowthMultiplier,
                     herbCfg.greenThumb.maxGrowthMultiplier, level);
 
@@ -89,7 +85,7 @@ public abstract class BlockOnPlacedMixin {
             boolean hasHere  = cm.containsKey(k);
             boolean hasBelow = cm.containsKey(pos.down().asLong());
 
-            McRPG.getLogger().debug("[onPlaced] world={} wHash={} cmHash={} size={}" +
+            McRPG.getLogger().debug("onPlaced: world={} wHash={} cmHash={} size={}" +
                             "pos={} long={} wrote={} hasHere={} hasBelow={}",
                     sw.getRegistryKey().getValue(),
                     System.identityHashCode(sw),

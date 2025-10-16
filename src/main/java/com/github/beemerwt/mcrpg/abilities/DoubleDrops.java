@@ -3,7 +3,7 @@ package com.github.beemerwt.mcrpg.abilities;
 
 import com.github.beemerwt.mcrpg.McRPG;
 import com.github.beemerwt.mcrpg.config.ability.DoubleDropsConfig;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import net.minecraft.block.Block;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.ItemStack;

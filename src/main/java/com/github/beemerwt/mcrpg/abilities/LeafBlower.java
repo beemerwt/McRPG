@@ -4,7 +4,7 @@ import com.github.beemerwt.mcrpg.McRPG;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.WoodcuttingConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.Item;
@@ -41,8 +41,7 @@ public class LeafBlower {
         Identifier saplingId = LEAF_TO_SAPLING.get(Registries.BLOCK.getId(state.getBlock()));
         Item sapling = Registries.ITEM.get(saplingId);
 
-        var data = McRPG.getStore().get(player);
-        int level = Leveling.levelFromTotalXp(data.xp.get(SkillType.WOODCUTTING));
+        int level = Leveling.getLevel(player, SkillType.WOODCUTTING);
         if (level < cfg.leafBlower.minLevel) return;
 
         if (!world.breakBlock(pos, false, player)) {

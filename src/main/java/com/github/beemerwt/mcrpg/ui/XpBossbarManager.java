@@ -1,11 +1,12 @@
 package com.github.beemerwt.mcrpg.ui;
 
+import com.github.beemerwt.mcrpg.config.GeneralConfig;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.SkillConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.text.NamedTextColor;
 import com.github.beemerwt.mcrpg.util.SoundUtil;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -70,15 +71,19 @@ public final class XpBossbarManager {
     }
 
     public static void showSkillXp(ServerPlayerEntity sp, SkillType skill, long justAdded, long newTotalXp, boolean playSound) {
+        GeneralConfig cfg = ConfigManager.getGeneralConfig();
         SkillConfig skillCfg = ConfigManager.getSkillConfig(skill);
         if (justAdded == 0) return; // nothing to show
 
         // Compute level, progress within level, and next requirement
-        int beforeLevel = Leveling.levelFromTotalXp(Math.max(0, newTotalXp - justAdded));
-        int level = Leveling.levelFromTotalXp(newTotalXp);
-        long xpAtLevelStart = cumulativeXpForLevel(level);
-        long intoLevel = Math.max(0, newTotalXp - xpAtLevelStart);
-        long nextNeed = Leveling.xpForLevel(Math.max(1, level + 1));
+        long xpBefore = Math.max(0, newTotalXp - justAdded);
+        int beforeLevel = Leveling.levelForTotalXp(xpBefore, cfg);
+
+        int level = Leveling.levelForTotalXp(newTotalXp, cfg);
+        long xpAtLevel = Leveling.totalXpForLevel(level);
+
+        long intoLevel = Math.max(0, newTotalXp - xpAtLevel);
+        long nextNeed = Leveling.totalXpForLevel(Math.max(1, level + 1));
         float progress = nextNeed == 0 ? 0f : Math.min(1f, (float) intoLevel / (float) nextNeed);
 
         if (beforeLevel < level && playSound) {
@@ -118,14 +123,5 @@ public final class XpBossbarManager {
         if (s == null) return BossBar.Color.BLUE;
         try { return BossBar.Color.valueOf(s.trim().toUpperCase()); }
         catch (IllegalArgumentException ex) { return BossBar.Color.BLUE; }
-    }
-
-    private static long cumulativeXpForLevel(int level) {
-        // Total XP required to have *reached* this level (i.e., start of the level).
-        // Level 0 -> 0; Level 1 -> xpForLevel(1); Level 2 -> xpForLevel(1)+xpForLevel(2); etc.
-        long total = 0;
-        for (int i = 1; i <= level; i++)
-            total += Leveling.xpForLevel(i);
-        return total;
     }
 }

@@ -1,246 +1,185 @@
 package com.github.beemerwt.mcrpg.command;
 
 import com.github.beemerwt.mcrpg.McRPG;
-import com.github.beemerwt.mcrpg.managers.ConfigManager;
-import com.github.beemerwt.mcrpg.data.PlayerData;
-import com.github.beemerwt.mcrpg.data.PlayerStore;
-import com.github.beemerwt.mcrpg.permission.Permissions;
-import com.github.beemerwt.mcrpg.managers.AbilityManager;
+import com.github.beemerwt.mcrpg.command.suggest.PlayerSuggester;
+import com.github.beemerwt.mcrpg.command.suggest.SkillSuggester;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import com.github.beemerwt.mcrpg.data.SkillType;
-import com.github.beemerwt.mcrpg.ui.XpBossbarManager;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.managers.AbilityManager;
+import com.github.beemerwt.mcrpg.managers.ConfigManager;
+import com.github.beemerwt.mcrpg.permission.OpLevel;
+import com.github.beemerwt.mcrpg.permission.Permissions;
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import java.util.Optional;
 
+import static com.github.beemerwt.mcrpg.util.CommandUtils.*;
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
 public final class AdminCommand {
+    private static final SuggestionProvider<ServerCommandSource> ON_OFF_SUGGESTIONS = (context, builder) -> {
+        builder.suggest("on", Text.literal("Enable debug mode"));
+        builder.suggest("off", Text.literal("Disable debug mode"));
+        return builder.buildFuture();
+    };
+
     private AdminCommand() {}
 
-    public static void register(PlayerStore store) {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) -> {
-            dispatcher.register(literal("mcrpg")
-                    .requires(Permissions.require("mcrpg.admin", 2))
+    public static void register(CommandDispatcher<ServerCommandSource> d) {
+        d.register(literal("mcrpg")
+            .requires(src -> Permissions.check(src, "mcrpg.admin", OpLevel.ADMIN))
 
-                    // /mcrpg saveall
-                    .then(literal("saveall").executes(ctx -> {
-                        ctx.getSource().sendFeedback(() -> Text.literal("McRPG player data saved."), false);
-                        return 1;
-                    }))
+            .then(literal("debug")
+                .then(argument("enabled", StringArgumentType.word()).suggests(ON_OFF_SUGGESTIONS)
+                .executes(ctx -> safe(ctx, () -> {
+                    var onOff = StringArgumentType.getString(ctx, "enabled");
+                    if (!onOff.equals("on") && !onOff.equals("off"))
+                        return fail(ctx, "Invalid argument: " + onOff + ". Use 'on' or 'off'.");
 
-                    // /mcrpg reload
-                    .then(literal("reload").executes(ctx -> {
-                        long start = System.nanoTime();
-                        try {
-                            ConfigManager.reloadAll();
-                            long ms = (System.nanoTime() - start) / 1_000_000L;
-                            ctx.getSource().sendFeedback(() -> Text.literal("McRPG configs reloaded (" + ms + " ms)."), true);
-                            return 1;
-                        } catch (Exception ex) {
-                            throw new SimpleCommandExceptionType(Text.literal("Reload failed: " + ex.getMessage())).create();
-                        }
-                    }))
+                    var enabled = onOff.equals("on");
+                    ConfigManager.setDebug(enabled);
+                    return ok(ctx, "Debug " + (enabled ? "enabled" : "disabled") + ".", false);
+                }))))
 
-                    // ========= setlevel =========
-                    // New form: /mcrpg setlevel <player> <skill> <level>
-                    .then(literal("setlevel")
-                            .then(argument("player", StringArgumentType.word()).suggests(PLAYER_SUGGESTIONS)
-                                    .then(argument("skill", StringArgumentType.word()).suggests(SKILL_SUGGESTIONS)
-                                            .then(argument("level", IntegerArgumentType.integer(0))
-                                                    .executes(ctx -> {
-                                                        ServerPlayerEntity target = EntityArgumentType.getPlayer(ctx, "player");
-                                                        return handleSetLevel(ctx, store, target);
-                                                    })
-                                            )
-                                    )
-                            )
-                    )
+            .then(literal("reload")
+                .executes(ctx -> safe(ctx, () -> {
+                    try {
+                        reload(ctx);
+                        return ok(ctx, "McRPG reloaded.", true);
+                    } catch (Exception e) {
+                        return fail(ctx, "Reload failed: " + e.getMessage());
+                    }
+                })))
 
-                    // ========= addxp =========
-                    // New form: /mcrpg addxp <player> <skill> <xp>
-                    .then(literal("addxp")
-                            .then(argument("player", StringArgumentType.word()).suggests(PLAYER_SUGGESTIONS)
-                                    .then(argument("skill", StringArgumentType.word()).suggests(SKILL_SUGGESTIONS)
-                                            .then(argument("xp", LongArgumentType.longArg(1))
-                                                    .executes(ctx -> {
-                                                        ServerPlayerEntity target = EntityArgumentType.getPlayer(ctx, "player");
-                                                        return handleAddXp(ctx, store, target);
-                                                    })
-                                            )
-                                    )
-                            )
-                    )
-
-                    // ========= subxp =========
-                    // New form: /mcrpg subxp <player> <skill> <xp>
-                    .then(literal("subxp")
-                            .then(argument("player", StringArgumentType.word()).suggests(PLAYER_SUGGESTIONS)
-                                    .then(argument("skill", StringArgumentType.word()).suggests(SKILL_SUGGESTIONS)
-                                            .then(argument("xp", LongArgumentType.longArg(1))
-                                                    .executes(ctx -> {
-                                                        ServerPlayerEntity target = EntityArgumentType.getPlayer(ctx, "player");
-                                                        return handleSubXp(ctx, store, target);
-                                                    })
-                                            )
-                                    )
-                            )
-                    )
-
-                    // /mcrpg resetcd  (self)
-                    .then(literal("resetcd").executes(ctx -> {
-                        ServerPlayerEntity player = ctx.getSource().getPlayerOrThrow();
+            .then(literal("resetcd")
+                .executes(ctx -> safe(ctx, () -> {
+                    var player = ctx.getSource().getPlayer();
+                    if (player == null) return fail(ctx, "Run this in-game.");
+                    try {
                         AbilityManager.clearAllFor(player.getUuid());
-                        ctx.getSource().sendFeedback(() -> Text.literal("Reset all ability cooldowns."), false);
-                        return 1;
-                    }))
+                        return ok(ctx, "Reset all ability cooldowns.", false);
+                    } catch (Exception e) {
+                        return fail(ctx, "Failed to reset cooldowns: " + e.getMessage());
+                    }
+                })))
 
-                    .then(literal("debug")
-                            .then(argument("enabled", StringArgumentType.word()).suggests(ON_OFF_SUGGESTIONS)
-                                    .executes(ctx -> {
-                                        String raw = StringArgumentType.getString(ctx, "enabled");
-                                        boolean on;
-                                        if (raw.equalsIgnoreCase("on")) on = true;
-                                        else if (raw.equalsIgnoreCase("off")) on = false;
-                                        else throw new SimpleCommandExceptionType(Text.literal("Expected 'on' or 'off', got: " + raw)).create();
+            .then(literal("setlevel")
+                .then(argument("player", StringArgumentType.word()).suggests(PlayerSuggester.DATABASE)
+                .then(argument("skill", StringArgumentType.word()).suggests(SkillSuggester.INSTANCE)
+                .then(argument("level", IntegerArgumentType.integer(0))
+                .executes(AdminCommand::execSetLevel)))))
 
-                                        ConfigManager.setDebug(on);
-                                        ctx.getSource().sendFeedback(() -> Text.literal("Set debug " + (on ? "ON" : "OFF")), false);
-                                        return 1;
-                                    })
-                            ))
-            );
+            .then(literal("addxp")
+                .then(argument("player", StringArgumentType.word()).suggests(PlayerSuggester.DATABASE)
+                .then(argument("skill", StringArgumentType.word()).suggests(SkillSuggester.INSTANCE)
+                .then(argument("amount", LongArgumentType.longArg(1))
+                .executes(AdminCommand::execAddXp)))))
+
+            .then(literal("subxp")
+                .then(argument("player", StringArgumentType.word()).suggests(PlayerSuggester.DATABASE)
+                .then(argument("skill", StringArgumentType.word()).suggests(SkillSuggester.INSTANCE)
+                .then(argument("amount", LongArgumentType.longArg(1))
+                .executes(AdminCommand::execSubXp)))))
+        );
+    }
+
+    // ---------------- executes ----------------
+
+    private static int execSetLevel(CommandContext<ServerCommandSource> ctx) {
+        return safe(ctx, () -> {
+            var name  = StringArgumentType.getString(ctx, "player");
+            var raw   = StringArgumentType.getString(ctx, "skill");
+            int level = IntegerArgumentType.getInteger(ctx, "level");
+
+            Optional<SkillType> optSkill = SkillType.parseSkill(raw);
+            if (optSkill.isEmpty()) return fail(ctx, "Invalid skill: " + raw);
+            SkillType skill = optSkill.get();
+
+            var player = McRPG.getStore().lookup(name);
+            if (player.isEmpty()) return fail(ctx, "Player not found: " + name);
+
+            var online = McRPG.getServer().getPlayerManager().getPlayer(name);
+            if (online != null) {
+                online.sendMessage(Text.literal("Your " + skill.getName() + " level was set to " + level + ".")
+                    .formatted(Formatting.YELLOW), false);
+            }
+
+            Leveling.setLevel(player.get(), skill, level);
+            return ok(ctx, "Set " + name + " " + skill + " to level " + level + ".", false);
         });
     }
 
-    /* ----------------- handlers ----------------- */
+    private static int execAddXp(CommandContext<ServerCommandSource> ctx) {
+        return safe(ctx, () -> {
+            String name = StringArgumentType.getString(ctx, "player");
+            String raw  = StringArgumentType.getString(ctx, "skill");
+            long amount = LongArgumentType.getLong(ctx, "amount");
+            if (amount == 0) return fail(ctx, "Amount must be non-zero.");
 
-    // Snap to start of level; clamp to [0, maxLevel]
-    private static int handleSetLevel(CommandContext<ServerCommandSource> ctx, PlayerStore store, ServerPlayerEntity target) throws CommandSyntaxException {
-        SkillType skill = parseSkill(ctx, "skill");
-        int requested = IntegerArgumentType.getInteger(ctx, "level");
+            Optional<SkillType> optSkill = SkillType.parseSkill(raw);
+            if (optSkill.isEmpty()) return fail(ctx, "Invalid skill: " + raw);
+            SkillType skill = optSkill.get();
 
-        int maxLevel = Math.max(0, ConfigManager.getGeneralConfig().maxLevel);
-        int newLevel = Math.min(Math.max(0, requested), maxLevel);
+            var player = McRPG.getStore().lookup(name);
+            if (player.isEmpty()) return fail(ctx, "Player not found: " + name);
 
-        long newTotal = Leveling.totalXpFromLevel(newLevel); // no % preservation
-        PlayerData data = store.get(target);
-        data.xp.put(skill, newTotal);
+            Leveling.addXp(player.get(), skill, amount);
 
-        XpBossbarManager.showSkillXp(target, skill, 0, newTotal, false);
+            var online = McRPG.getServer().getPlayerManager().getPlayer(name);
+            if (online != null) {
+                online.sendMessage(Text.literal("You received " + amount + " XP in " + skill + ".")
+                    .formatted(Formatting.YELLOW), false);
+            }
 
-        ctx.getSource().sendFeedback(
-                () -> Text.literal("Set " + target.getName().getString() + " " + skill.name().toLowerCase(Locale.ROOT)
-                        + " to level " + newLevel + " (0% into level)"),
-                false
-        );
-        return 1;
+            return ok(ctx, "Gave " + amount + " XP to " + name + " (" + skill + ").", false);
+        });
     }
 
-    // Clamp to [0, maxTotalXp()]
-    private static int handleAddXp(CommandContext<ServerCommandSource> ctx, PlayerStore store, ServerPlayerEntity target) throws CommandSyntaxException {
-        SkillType skill = parseSkill(ctx, "skill");
-        long add = LongArgumentType.getLong(ctx, "xp");
+    private static int execSubXp(CommandContext<ServerCommandSource> ctx) {
+        return safe(ctx, () -> {
+            String name  = StringArgumentType.getString(ctx, "player");
+            String raw   = StringArgumentType.getString(ctx, "skill");
+            long amount  = LongArgumentType.getLong(ctx, "amount");
+            if (amount <= 0) return fail(ctx, "Amount must be non-zero.");
 
-        PlayerData data = store.get(target);
-        long cur = data.xp.getOrDefault(skill, 0L);
-        long capped = Math.min(Long.MAX_VALUE, cur + add); // avoid overflow
-        long next = Math.min(capped, Leveling.maxTotalXp());
-        next = Math.max(0L, next);
+            Optional<SkillType> optSkill = SkillType.parseSkill(raw);
+            if (optSkill.isEmpty()) return fail(ctx, "Invalid skill: " + raw);
+            SkillType skill = optSkill.get();
 
-        data.xp.put(skill, next);
-        XpBossbarManager.showSkillXp(target, skill, add, next, false);
+            var player = McRPG.getStore().lookup(name);
+            if (player.isEmpty()) return fail(ctx, "Player not found: " + name);
 
-        final long nextFinal = next;
+            var online = McRPG.getServer().getPlayerManager().getPlayer(name);
+            if (online != null) {
+                online.sendMessage(Text.literal("You lost " + amount + " XP in " + skill + ".")
+                    .formatted(Formatting.YELLOW), false);
+            }
 
-        ctx.getSource().sendFeedback(
-                () -> Text.literal("Added " + add + " XP to " + target.getName().getString() + " " + skill.name().toLowerCase(Locale.ROOT)
-                        + " (total " + nextFinal + ")"),
-                false
-        );
-        return 1;
+            Leveling.addXp(player.get(), skill, -amount);
+            return ok(ctx, "Removed " + amount + " XP from " + name + " (" + skill + ").", false);
+        });
     }
 
-    // Clamp to [0, maxTotalXp()] (bottoming out at 0)
-    private static int handleSubXp(CommandContext<ServerCommandSource> ctx, PlayerStore store, ServerPlayerEntity target) throws CommandSyntaxException {
-        SkillType skill = parseSkill(ctx, "skill");
-        long sub = LongArgumentType.getLong(ctx, "xp");
+    // ---------------- helpers ----------------
 
-        PlayerData data = store.get(target);
-        long cur = data.xp.getOrDefault(skill, 0L);
-
-        long next = cur - sub;
-        if (next < 0L) next = 0L;
-        if (next > Leveling.maxTotalXp()) next = Leveling.maxTotalXp();
-
-        data.xp.put(skill, next);
-        XpBossbarManager.showSkillXp(target, skill, 0, next, false);
-
-        final long nextFinal = next;
-
-        ctx.getSource().sendFeedback(
-                () -> Text.literal("Subtracted " + sub + " XP from " + target.getName().getString() + " " + skill.name().toLowerCase(Locale.ROOT)
-                        + " (total " + nextFinal + ")"),
-                false
-        );
-        return 1;
-    }
-
-    /* ----------------- helpers ----------------- */
-
-    private static final SuggestionProvider<ServerCommandSource> SKILL_SUGGESTIONS =
-            (ctx, b) -> {
-                for (SkillType st : SkillType.values()) {
-                    b.suggest(st.name().toLowerCase(Locale.ROOT));
-                }
-                return b.buildFuture();
-            };
-
-    private static final SuggestionProvider<ServerCommandSource> PLAYER_SUGGESTIONS =
-            (ctx, b) -> {
-                List<String> suggested = new ArrayList<>();
-                for (ServerPlayerEntity p : ctx.getSource().getServer().getPlayerManager().getPlayerList()) {
-                    suggested.add(p.getStringifiedName());
-                }
-
-                for (var pd : McRPG.getStore().all()) {
-                    if (!pd.name.isEmpty() && !suggested.contains(pd.name))
-                        suggested.add(pd.name);
-                }
-
-                for (String s : suggested)
-                    b.suggest(s);
-
-                return b.buildFuture();
-            };
-
-    private static final SuggestionProvider<ServerCommandSource> ON_OFF_SUGGESTIONS =
-            (ctx, b) -> {
-                b.suggest("on");
-                b.suggest("off");
-                return b.buildFuture();
-            };
-
-    private static SkillType parseSkill(CommandContext<ServerCommandSource> ctx, String name) throws CommandSyntaxException {
-        String raw = StringArgumentType.getString(ctx, name);
+    public static void reload(CommandContext<ServerCommandSource> ctx) {
+        long start = System.nanoTime();
         try {
-            return SkillType.valueOf(raw.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
-            throw new SimpleCommandExceptionType(Text.literal("Unknown skill: " + raw)).create();
+            ConfigManager.reloadAll();
+            long ms = (System.nanoTime() - start) / 1_000_000L;
+            ctx.getSource().sendFeedback(() -> Text.literal("McRPG configs reloaded (" + ms + " ms)."), true);
+        } catch (Exception ex) {
+            ctx.getSource().sendError(Text.literal("Reload failed: " + ex.getMessage()));
         }
     }
 }

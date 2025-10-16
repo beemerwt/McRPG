@@ -1,27 +1,45 @@
 package com.github.beemerwt.mcrpg.skills;
 
 import com.github.beemerwt.mcrpg.McRPG;
+import com.github.beemerwt.mcrpg.callback.CropBlockEvents;
 import com.github.beemerwt.mcrpg.managers.ConfigManager;
 import com.github.beemerwt.mcrpg.config.skills.HerbalismConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.abilities.DoubleDrops;
 import com.github.beemerwt.mcrpg.abilities.GreenTerra;
+import com.github.beemerwt.mcrpg.persistent.CropMarkers;
+import com.github.beemerwt.mcrpg.proxies.CropBlockProxy;
 import com.github.beemerwt.mcrpg.util.Growth;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import net.minecraft.block.*;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
 import org.joml.Math;
 
 import java.util.List;
 
 public class Herbalism {
 
-    // TODO: FIX - XP is given even when the crop isn't grown
-    // TODO: Test - Green Terra replanting
+    public static void register() {
+        CropBlockEvents.RANDOM_TICK.register(Herbalism::onRandomTick);
+    }
+
+    private static void onRandomTick(ServerWorld world, CropBlockProxy proxy, Random random) {
+        float m = CropMarkers.get(world).getMultiplier(proxy.pos());
+        if (m <= 1.0f) return;
+
+        int extra = (int) Math.floor(m - 1.0f);
+        float frac = (m - 1.0f) - extra;
+        for (int i = 0; i < extra; i++)
+            proxy.randomTick(world, random);
+
+        if (random.nextFloat() < frac)
+            proxy.randomTick(world, random);
+    }
 
     public static void onCropBroken(ServerPlayerEntity player,
                                     ServerWorld world,
@@ -30,7 +48,6 @@ public class Herbalism {
                                     List<ItemStack> drops)
     {
         HerbalismConfig cfg = ConfigManager.getSkillConfig(SkillType.HERBALISM);
-        var data = McRPG.getStore().get(player);
         var blocks = cfg.getBlocks();
         var block = state.getBlock();
 
@@ -42,9 +59,7 @@ public class Herbalism {
         // GREEN TERRA: queue a replant candidate while active
         GreenTerra.considerReplant(player, world, pos, state);
 
-        var currentXp = data.xp.get(SkillType.HERBALISM);
-        int level = Leveling.levelFromTotalXp(currentXp);
-
+        int level = Leveling.getLevel(player, SkillType.HERBALISM);
         var id = Registries.BLOCK.getId(block);
 
         // Only trigger skills if the player is using a hoe and the crop supports double drops

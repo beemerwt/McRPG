@@ -6,7 +6,7 @@ import com.github.beemerwt.mcrpg.config.skills.HerbalismConfig;
 import com.github.beemerwt.mcrpg.data.SkillType;
 import com.github.beemerwt.mcrpg.util.Growth;
 import com.github.beemerwt.mcrpg.util.TickScheduler;
-import com.github.beemerwt.mcrpg.util.Leveling;
+import com.github.beemerwt.mcrpg.data.Leveling;
 import net.minecraft.block.*;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -104,8 +104,7 @@ public final class GreenTerra {
 
         // Chance is based on current level at time of flush
         HerbalismConfig cfg = ConfigManager.getSkillConfig(SkillType.HERBALISM);
-        long totalXp = McRPG.getStore().get(player).xp.get(SkillType.HERBALISM);
-        int lvl = Leveling.levelFromTotalXp(totalXp);
+        int lvl = Leveling.getLevel(player, SkillType.HERBALISM);
 
         double chance = Leveling.getScaledPercentage(
                 cfg.greenTerra.baseReplantChance,

@@ -2,6 +2,7 @@ package com.github.beemerwt.mcrpg.mixin;
 
 import com.github.beemerwt.mcrpg.callback.FurnaceEvents;
 import com.github.beemerwt.mcrpg.extension.FuelTimeExtension;
+import com.github.beemerwt.mcrpg.proxies.AbstractFurnaceBlockEntityProxy;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.item.ItemStack;
@@ -48,7 +49,9 @@ public abstract class AbstractFurnaceBlockEntityMixin implements FuelTimeExtensi
             ServerWorld world, BlockPos pos, BlockState state, AbstractFurnaceBlockEntity be,
             CallbackInfo ci
     ) {
-        FurnaceEvents.ITEM_SMELTED.invoker().onSmeltedItem(pos, be, be.getStack(0), be.getStack(2));
+        var proxy = AbstractFurnaceBlockEntityProxy.obtain(state, pos, world, be);
+        FurnaceEvents.ITEM_SMELTED.invoker().onSmeltedItem(proxy, be.getStack(0), be.getStack(2));
+        AbstractFurnaceBlockEntityProxy.release();
     }
 
     @Inject(
@@ -65,8 +68,13 @@ public abstract class AbstractFurnaceBlockEntityMixin implements FuelTimeExtensi
             ServerWorld world, BlockPos pos, BlockState state, AbstractFurnaceBlockEntity be,
             CallbackInfo ci
     ) {
-        ItemStack fuelStack = be.getStack(1); // inventory[1]
-        FurnaceEvents.FUEL_CONSUMED.invoker().onFuelConsumed(pos, be, fuelStack);
+        try {
+            var proxy = AbstractFurnaceBlockEntityProxy.obtain(state, pos, world, be);
+            ItemStack fuelStack = be.getStack(1); // inventory[1]
+            FurnaceEvents.FUEL_CONSUMED.invoker().onFuelConsumed(proxy, fuelStack);
+        } finally {
+            AbstractFurnaceBlockEntityProxy.release();
+        }
     }
 
     @Override
